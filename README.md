@@ -1,20 +1,37 @@
-# 🎯 AI English Buddy
+# HIWAR APP
 
-صديقك الذكي لتعليم اللغة الإنجليزية
+AI-powered English learning platform with conversational AI, error tracking, and personalized learning.
 
-## 📌 اليوم الأول: تشغيل السيرفر الأساسي
+## Features
 
-### ✅ المطلوب اليوم:
-- [x] إنشاء هيكل المشروع
-- [x] كتابة ملف `requirements.txt`
-- [x] كتابة ملف `main.py` الأساسي
-- [x] تشغيل السيرفر واختباره
+-  Voice conversation with AI
+-  Real-time error detection and correction
+-  Personalized learning path
+-  Progress tracking
+-  Spaced repetition for errors
+-  Multi-platform support
 
----
+## Tech Stack
 
-## 🚀 طريقة التشغيل
+- **Backend**: FastAPI, Python
+- **AI**: OpenAI GPT-4o-mini
+- **Database**: PostgreSQL/SQLite
+- **Voice**: ElevenLabs API (optional)
+- **Deployment**: Docker, Docker Compose
 
-### 1. تنزيل المكتبات
+## Quick Start
+
 ```bash
-cd backend
+# Clone repository
+git clone https://github.com/janabakri/HIWARApp.git
+cd hiwarapp/backend
+
+# Copy environment configuration
+cp .env.example .env
+# Edit .env with your API keys
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Run the application
+uvicorn app.main:app --reload
