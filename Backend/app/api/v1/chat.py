@@ -8,11 +8,10 @@ from pydantic import BaseModel
 from typing import List, Dict
 
 from ...core.database import get_db
-from ...core.config import settings
-from ...models.user import User
-from ...models.error import UserError
+from ...core.config import settings  
 from ...services.error_tracker import detect_errors
-import openai
+
+from openai import OpenAI
 
 router = APIRouter()
 
@@ -41,28 +40,40 @@ async def chat(
     # 2. Save user and errors (coming soon)
     
     # 3. Get AI response
-    client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
-    
-    prompt = f"""
-    You are an English teacher. Level: intermediate.
-    User message: {request.message}
-    
-    Detected errors: {errors}
-    
-    Requirements:
-    1. Reply naturally in English
-    2. Correct errors gently
-    3. If error is repeated, point it out
-    """
-    
-    response = client.chat.completions.create(
-        model=settings.OPENAI_MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7,
-        max_tokens=300
-    )
-    
-    reply = response.choices[0].message.content
+    reply = "Your message was received. I can help you improve it with gentle corrections."
+
+    if settings.OPENAI_API_KEY:
+
+        try:
+            
+            client = OpenAI(
+                api_key=settings.OPENAI_API_KEY,
+                base_url=settings.OPENAI_BASE_URL
+            )
+            
+            prompt = f"""
+            You are an English teacher. Level: intermediate.
+            User message: {request.message}
+            
+            Detected errors: {errors}
+            
+            Requirements:
+            1. Reply naturally in English
+            2. Correct errors gently
+            3. If error is repeated, point it out
+            """
+
+            response = client.chat.completions.create(
+                model=settings.OPENAI_MODEL,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            
+            ai_reply = response.choices[0].message.content
+            if ai_reply:
+                reply = ai_reply
+                
+        except Exception as exc:
+            reply = f"OpenAI request failed. Details: {exc}"
     
     # 4. Prepare corrections
     corrections = [
