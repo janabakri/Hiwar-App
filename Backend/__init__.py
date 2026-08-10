@@ -1,1 +1,4 @@
-# This file tells Python that this directory is a package
+"""
+Hiwar App - Backend Package
+This file makes the 'app' directory a Python package.
+"""
