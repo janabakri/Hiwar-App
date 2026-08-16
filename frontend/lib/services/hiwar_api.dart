@@ -39,6 +39,34 @@ class HiwarStats {
   }
 }
 
+class HiwarProfile {
+  final String userId;
+  final String name;
+  final String? email;
+  final int? age;
+  final String? educationLevel;
+  final String? certificates;
+  final String? learningReason;
+  final bool profileComplete;
+  final String level;
+  final int levelScore;
+
+  const HiwarProfile({required this.userId, required this.name, this.email, this.age, this.educationLevel, this.certificates, this.learningReason, required this.profileComplete, required this.level, required this.levelScore});
+
+  factory HiwarProfile.fromJson(Map<String, dynamic> json) => HiwarProfile(
+    userId: '${json['user_id'] ?? ''}',
+    name: '${json['name'] ?? json['user_name'] ?? ''}',
+    email: json['email'] as String?,
+    age: (json['age'] as num?)?.toInt(),
+    educationLevel: json['education_level'] as String?,
+    certificates: json['certificates'] as String?,
+    learningReason: json['learning_reason'] as String?,
+    profileComplete: json['profile_complete'] == true,
+    level: '${json['level'] ?? 'intermediate'}',
+    levelScore: (json['level_score'] as num?)?.toInt() ?? 0,
+  );
+}
+
 class HiwarApi {
   HiwarApi()
       : _dio = Dio(BaseOptions(
@@ -56,6 +84,26 @@ class HiwarApi {
   }
 
   String get baseUrl => _dio.options.baseUrl;
+
+  Future<HiwarProfile> signIn({required String userId, required String name, String? email, String provider = 'manual', String? subject}) async {
+    final response = await _dio.post('/api/v1/auth/sign-in', data: {'user_id': userId, 'name': name, 'email': email, 'auth_provider': provider, 'auth_subject': subject});
+    return HiwarProfile.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<HiwarProfile> getProfile(String userId) async {
+    final response = await _dio.get('/api/v1/profile/${Uri.encodeComponent(userId)}');
+    return HiwarProfile.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<HiwarProfile> updateProfile({required String userId, required String name, int? age, String? educationLevel, String? certificates, String? learningReason}) async {
+    final response = await _dio.put('/api/v1/profile', data: {'user_id': userId, 'name': name, 'age': age, 'education_level': educationLevel, 'certificates': certificates, 'learning_reason': learningReason});
+    return HiwarProfile.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<String?> getStoredUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('hiwar_user_id');
+  }
 
   Future<String> getUserId() async {
     final prefs = await SharedPreferences.getInstance();
