@@ -42,13 +42,18 @@ class HiwarStats {
 class HiwarApi {
   HiwarApi()
       : _dio = Dio(BaseOptions(
-          baseUrl: (dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:8000').replaceFirst(RegExp(r'/$'), ''),
+          baseUrl: _apiBaseUrl().replaceFirst(RegExp(r'/$'), ''),
           connectTimeout: const Duration(seconds: 8),
           receiveTimeout: const Duration(seconds: 8),
           headers: {'Content-Type': 'application/json'},
         ));
 
   final Dio _dio;
+
+  static String _apiBaseUrl() {
+    final configured = dotenv.isInitialized ? dotenv.env['API_BASE_URL'] : null;
+    return configured == null || configured.trim().isEmpty ? 'http://localhost:8000' : configured.trim();
+  }
 
   String get baseUrl => _dio.options.baseUrl;
 
