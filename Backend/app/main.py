@@ -7,10 +7,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .core.config import settings
 from .core.database import engine, Base
-from .api.v1 import chat
+from .core.migrations import ensure_user_profile_columns
+from .api.v1 import chat, profile
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
+ensure_user_profile_columns(engine)
 
 # Create application
 app = FastAPI(
@@ -30,6 +32,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
+app.include_router(profile.router, prefix="/api/v1", tags=["profile"])
 
 # Root endpoints
 @app.get("/")

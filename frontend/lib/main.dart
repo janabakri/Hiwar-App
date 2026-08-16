@@ -2,6 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'screens/home_screen.dart';
+import 'screens/auth_screen.dart';
+import 'screens/onboarding_screen.dart';
+import 'services/hiwar_api.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,8 +27,38 @@ class SpeakReplicaApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: primary, brightness: Brightness.light),
         textTheme: GoogleFonts.ibmPlexSansArabicTextTheme(),
       ),
-      home: const HomeScreen(),
+      home: const AuthGate(),
     );
+  }
+}
+
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+  @override State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  final api = HiwarApi();
+  HiwarProfile? profile;
+  bool loading = true;
+
+  @override void initState() { super.initState(); _restore(); }
+
+  Future<void> _restore() async {
+    final userId = await api.getStoredUserId();
+    if (userId != null && userId.isNotEmpty) {
+      try { profile = await api.getProfile(userId); } catch (_) { profile = null; }
+    }
+    if (mounted) setState(() => loading = false);
+  }
+
+  void _signedIn(HiwarProfile next) => setState(() => profile = next);
+
+  @override Widget build(BuildContext context) {
+    if (loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (profile == null) return AuthScreen(api: api, onSignedIn: _signedIn);
+    if (!profile!.profileComplete) return OnboardingScreen(api: api, profile: profile!, onComplete: _signedIn);
+    return HomeScreen(profile: profile);
   }
 }
 
