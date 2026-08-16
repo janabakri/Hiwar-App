@@ -130,6 +130,16 @@ class HiwarApi {
     await prefs.setString('hiwar_user_id', userId.trim());
   }
 
+  Future<bool> hasSeenWelcome() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('hiwar_welcome_seen') ?? false;
+  }
+
+  Future<void> markWelcomeSeen() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('hiwar_welcome_seen', true);
+  }
+
   Future<HiwarStats> getStats(String userId) async {
     try {
       final response = await _dio.get('/api/v1/stats/${Uri.encodeComponent(userId)}');
