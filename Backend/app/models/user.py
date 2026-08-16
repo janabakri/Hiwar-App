@@ -23,6 +23,10 @@ class User(Base):
     certificates = Column(Text, nullable=True)
     learning_reason = Column(Text, nullable=True)
     profile_complete = Column(Boolean, default=False, nullable=False)
+    password_hash = Column(String(255), nullable=True)
+    verification_code = Column(String(10), nullable=True)
+    verification_expires_at = Column(DateTime, nullable=True)
+    email_verified = Column(Boolean, default=False, nullable=False)
     
     # Level and progress
     level = Column(String(20), default="intermediate")
