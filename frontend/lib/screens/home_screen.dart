@@ -342,7 +342,7 @@ class ExploreContent extends StatelessWidget {
       const _SparkleArt(),
     ])),
     const SizedBox(height: 16),
-    GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1.05, children: const [_Skill(title: 'التحدث', english: 'Speaking', value: 70, color: primaryTint), _Skill(title: 'الاستماع', english: 'Listening', value: 55, color: Color(0xFFE7EEF7)), _Skill(title: 'القراءة', english: 'Reading', value: 48, color: Color(0xFFF7EEDB)), _Skill(title: 'الكتابة', english: 'Writing', value: 40, color: Color(0xFFF6E6EB)), _Skill(title: 'القواعد', english: 'Grammar', value: 58, color: Color(0xFFE9E7F2)), _Skill(title: 'المفردات', english: 'Vocabulary', value: rustTint)],),
+    GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1.05, children: const [_Skill(title: 'التحدث', english: 'Speaking', value: 70, color: primaryTint), _Skill(title: 'الاستماع', english: 'Listening', value: 55, color: Color(0xFFE7EEF7)), _Skill(title: 'القراءة', english: 'Reading', value: 48, color: Color(0xFFF7EEDB)), _Skill(title: 'الكتابة', english: 'Writing', value: 40, color: Color(0xFFF6E6EB)), _Skill(title: 'القواعد', english: 'Grammar', value: 58, color: Color(0xFFE9E7F2)), _Skill(title: 'المفردات', english: 'Vocabulary', value: 65, color: const Color(0xFFF8E7E6))],),
   ]);
 }
 class _Skill extends StatelessWidget {final String title,english;final int value;final Color color;const _Skill({required this.title,required this.english,required this.value,required this.color});@override Widget build(BuildContext context)=>_Card(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Container(width:38,height:38,decoration:BoxDecoration(color:color,borderRadius:BorderRadius.circular(11)),child:const Icon(Icons.auto_awesome_outlined,size:19,color:primary)),const SizedBox(height:9),Text(title,style:ar(13.5,weight:FontWeight.w700)),Text(english,style:en(11,color:inkFaint)),const Spacer(),ClipRRect(borderRadius:BorderRadius.circular(5),child:LinearProgressIndicator(value:value/100,minHeight:5,backgroundColor:line,color:primary)),const SizedBox(height:5),Text('$value%',style:mono(10.5,color:inkFaint))]));}
@@ -383,31 +383,60 @@ class _FeedbackCelebration extends StatelessWidget {
 
 class _SparkleArt extends StatelessWidget {
   const _SparkleArt();
+
   @override
-  Widget build(BuildContext context) => SizedBox(width: 72, height: 72, child: Stack(alignment: Alignment.center, children: [
-    Container(width: 58, height: 58, decoration: BoxDecoration(color: Colors.white.withOpacity(.08), shape: BoxShape.circle)),
-    Container(width: 38, height: 38, decoration: BoxDecoration(color: Colors.white.withOpacity(.14), shape: BoxShape.circle)),
-    const Icon(Icons.auto_awesome, color: Colors.white, size: 30),
-    Positioned(top: 2, right: 4, child: Container(width: 5, height: 5, decoration: const BoxDecoration(color: Colors.white70, shape: BoxShape.circle))),
-    Positioned(bottom: 8, left: 2, child: Container(width: 4, height: 4, decoration: const BoxDecoration(color: Colors.white54, shape: BoxShape.circle))),
-  ]);
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 72,
+      height: 72,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(width: 58, height: 58, decoration: BoxDecoration(color: Colors.white.withOpacity(.08), shape: BoxShape.circle)),
+          Container(width: 38, height: 38, decoration: BoxDecoration(color: Colors.white.withOpacity(.14), shape: BoxShape.circle)),
+          const Icon(Icons.auto_awesome, color: Colors.white, size: 30),
+          Positioned(top: 2, right: 4, child: Container(width: 5, height: 5, decoration: const BoxDecoration(color: Colors.white70, shape: BoxShape.circle))),
+          Positioned(bottom: 8, left: 2, child: Container(width: 4, height: 4, decoration: const BoxDecoration(color: Colors.white54, shape: BoxShape.circle))),
+        ],
+      ),
+    );
+  }
 }
 
 class _LevelMeterArt extends StatelessWidget {
   final double size;
   const _LevelMeterArt({this.size = 82});
+
   @override
-  Widget build(BuildContext context) => SizedBox(width: size, height: size, child: Stack(alignment: Alignment.bottomCenter, children: [
-    Positioned(bottom: size * .16, left: size * .15, right: size * .12, child: Row(crossAxisAlignment: CrossAxisAlignment.end, mainAxisAlignment: MainAxisAlignment.center, children: [
-      Container(width: size * .16, height: size * .30, decoration: BoxDecoration(color: const Color(0xFFD9D3EE), borderRadius: BorderRadius.circular(5))),
-      SizedBox(width: size * .07),
-      Container(width: size * .16, height: size * .47, decoration: BoxDecoration(color: const Color(0xFF9D94C9), borderRadius: BorderRadius.circular(5))),
-      SizedBox(width: size * .07),
-      Container(width: size * .16, height: size * .66, decoration: BoxDecoration(color: primary, borderRadius: BorderRadius.circular(5))),
-    ])),
-    Positioned(bottom: size * .10, left: size * .12, right: size * .12, child: Container(height: 2, color: primaryDark.withOpacity(.35))),
-    Positioned(top: 2, right: size * .18, child: Icon(Icons.star_rounded, color: const Color(0xFFD9581F), size: size * .26)),
-  ]);
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        children: [
+          Positioned(
+            bottom: size * .16,
+            left: size * .15,
+            right: size * .12,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(width: size * .16, height: size * .30, decoration: BoxDecoration(color: const Color(0xFFD9D3EE), borderRadius: BorderRadius.circular(5))),
+                SizedBox(width: size * .07),
+                Container(width: size * .16, height: size * .47, decoration: BoxDecoration(color: const Color(0xFF9D94C9), borderRadius: BorderRadius.circular(5))),
+                SizedBox(width: size * .07),
+                Container(width: size * .16, height: size * .66, decoration: BoxDecoration(color: primary, borderRadius: BorderRadius.circular(5))),
+              ],
+            ),
+          ),
+          Positioned(bottom: size * .10, left: size * .12, right: size * .12, child: Container(height: 2, color: primaryDark.withOpacity(.35))),
+          Positioned(top: 2, right: size * .18, child: Icon(Icons.star_rounded, color: const Color(0xFFD9581F), size: size * .26)),
+        ],
+      ),
+    );
+  }
 }
 
 class _ProfileExtras extends StatelessWidget {
