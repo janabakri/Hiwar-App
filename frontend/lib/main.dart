@@ -34,3 +34,6 @@ class SpeakReplicaApp extends StatelessWidget {
     );
   }
 }
+
+// توافق رجعي مع widget_test.dart القديم في بعض النسخ المحلية.
+typedef MyApp = SpeakReplicaApp;
