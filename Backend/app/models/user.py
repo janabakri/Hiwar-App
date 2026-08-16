@@ -2,7 +2,7 @@
 User model for storing account information.
 """
 
-from sqlalchemy import Column, Integer, String, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from ..core.database import Base
@@ -14,6 +14,15 @@ class User(Base):
     user_id = Column(String(50), unique=True, index=True, nullable=False)
     name = Column(String(50), nullable=False)
     email = Column(String(100), unique=True, nullable=True)
+    auth_provider = Column(String(30), default="manual", nullable=False)
+    auth_subject = Column(String(255), nullable=True, index=True)
+
+    # Profile onboarding
+    age = Column(Integer, nullable=True)
+    education_level = Column(String(80), nullable=True)
+    certificates = Column(Text, nullable=True)
+    learning_reason = Column(Text, nullable=True)
+    profile_complete = Column(Boolean, default=False, nullable=False)
     
     # Level and progress
     level = Column(String(20), default="intermediate")
