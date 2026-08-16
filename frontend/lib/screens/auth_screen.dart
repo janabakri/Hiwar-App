@@ -123,14 +123,11 @@ class _AuthScreenState extends State<AuthScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFFF6F3EF),
         body: SafeArea(child: ListView(padding: const EdgeInsets.fromLTRB(22, 24, 22, 28), children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Container(width: 42, height: 42, decoration: const BoxDecoration(color: primary, shape: BoxShape.circle), child: const Icon(Icons.forum_outlined, color: Colors.white, size: 22)),
-            Text('حوار App', style: arabic(14, weight: FontWeight.w700, color: const Color(0xFF635C7A))),
-          ]),
-          const SizedBox(height: 28),
-          Text(waitingForCode ? 'باقي خطوة واحدة' : (signupMode ? 'أنشئي حسابك في حوار' : 'أهلًا بك في حوار'), style: arabic(26, weight: FontWeight.w800)),
-          const SizedBox(height: 7),
-          Text(waitingForCode ? 'تحققي من بريدك الإلكتروني لنكمل معًا.' : (signupMode ? 'احفظي تقدمك وخلي تجربتك مصممة لك.' : 'تحدثي أكثر، ترددي أقل، وتقدمي كل يوم.'), style: arabic(13, color: const Color(0xFF948DA6)).copyWith(height: 1.6)),
+          Center(child: Container(width: 56, height: 56, decoration: BoxDecoration(color: primary, borderRadius: BorderRadius.circular(17), boxShadow: [BoxShadow(color: primary.withOpacity(.22), blurRadius: 18, offset: const Offset(0, 8))]), child: const Icon(Icons.mic_none_rounded, color: Colors.white, size: 27))),
+          const SizedBox(height: 18),
+          Center(child: Text(waitingForCode ? 'باقي خطوة واحدة' : (signupMode ? 'أنشئي حسابك في حوار' : 'أهلًا فيك 👋'), textAlign: TextAlign.center, style: arabic(19, weight: FontWeight.w800))),
+          const SizedBox(height: 6),
+          Center(child: Text(waitingForCode ? 'تحققي من بريدك الإلكتروني لنكمل معًا.' : (signupMode ? 'احفظي تقدمك وخلي تجربتك مصممة لك.' : 'سجّلي دخولك عشان تكملي رحلتك بالإنجليزي'), textAlign: TextAlign.center, style: arabic(12.5, color: const Color(0xFF948DA6)).copyWith(height: 1.6))),
           const SizedBox(height: 24),
           Container(padding: const EdgeInsets.all(19), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: const Color(0xFF32265C).withOpacity(.06), blurRadius: 24, offset: const Offset(0, 10))]), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             if (!signupMode && !waitingForCode) ...[
