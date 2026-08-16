@@ -85,6 +85,16 @@ class HiwarApi {
 
   String get baseUrl => _dio.options.baseUrl;
 
+  Future<Map<String, dynamic>> signUp({required String name, required String email, required String password}) async {
+    final response = await _dio.post('/api/v1/auth/sign-up', data: {'name': name, 'email': email, 'password': password});
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<HiwarProfile> verifyEmail({required String email, required String code}) async {
+    final response = await _dio.post('/api/v1/auth/verify-email', data: {'email': email, 'code': code});
+    return HiwarProfile.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
   Future<HiwarProfile> signIn({required String userId, required String name, String? email, String provider = 'manual', String? subject}) async {
     final response = await _dio.post('/api/v1/auth/sign-in', data: {'user_id': userId, 'name': name, 'email': email, 'auth_provider': provider, 'auth_subject': subject});
     return HiwarProfile.fromJson(Map<String, dynamic>.from(response.data as Map));

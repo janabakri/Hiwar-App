@@ -60,5 +60,12 @@ class Settings:
     # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")
 
+    # Email verification
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM: str = os.getenv("SMTP_FROM", "")
+
 
 settings = Settings()

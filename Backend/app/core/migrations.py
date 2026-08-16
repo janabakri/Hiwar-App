@@ -15,6 +15,10 @@ def ensure_user_profile_columns(engine) -> None:
         "certificates": "TEXT",
         "learning_reason": "TEXT",
         "profile_complete": "BOOLEAN NOT NULL DEFAULT 0",
+        "password_hash": "VARCHAR(255)",
+        "verification_code": "VARCHAR(10)",
+        "verification_expires_at": "DATETIME",
+        "email_verified": "BOOLEAN NOT NULL DEFAULT 0",
     }
     with engine.begin() as connection:
         for name, definition in additions.items():
