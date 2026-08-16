@@ -1,54 +1,69 @@
-// مرجع التصميم: صفحة ترحيبية حوار App RTL، مساحة دافئة، بنفسجي عميق، ورسالة قصيرة تقود للدخول.
+// مرجع التصميم: onboarding هاتف RTL مطابق لـ speak-app-prototype(8).html؛ خلفية دافئة، blobs هندسية، ثلاث شرائح، نقاط تقدم وزر التالي.
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class WelcomeScreen extends StatelessWidget {
+const _bg = Color(0xFFF6F3EF);
+const _paper = Color(0xFFFFFFFF);
+const _ink = Color(0xFF241F38);
+const _inkSoft = Color(0xFF635C7A);
+const _inkFaint = Color(0xFF948DA6);
+const _primary = Color(0xFF4B3F8F);
+const _primaryTint = Color(0xFFECEAF7);
+const _coral = Color(0xFFD9581F);
+const _coralTint = Color(0xFFFBE7DA);
+const _amber = Color(0xFFB5842B);
+const _amberTint = Color(0xFFF7EEDB);
+
+class WelcomeScreen extends StatefulWidget {
   final VoidCallback onContinue;
   const WelcomeScreen({super.key, required this.onContinue});
 
-  TextStyle arabic(double size, {FontWeight weight = FontWeight.w400, Color color = const Color(0xFF241F38)}) {
-    return GoogleFonts.ibmPlexSansArabic(fontSize: size, fontWeight: weight, color: color);
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<WelcomeScreen> {
+  final controller = PageController();
+  int index = 0;
+
+  final slides = const [
+    _WelcomeSlide(title: 'تحدّث بحرية بالإنجليزي', text: 'محادثة صوتية طبيعية مع ذكاء اصطناعي يستمع لك ويرد عليك، مو تمارين جامدة.', type: _ArtType.voice),
+    _WelcomeSlide(title: 'تصحيح فوري وواضح', text: 'بعد كل محادثة تشوف أخطاءك، التصحيح، وسبب الخطأ بأسلوب مبسّط بدون تعقيد.', type: _ArtType.feedback),
+    _WelcomeSlide(title: 'الذكاء الاصطناعي يوجّهك', text: 'يقترح عليك وش تحتاج تتعلمه بناءً على مستواك وأخطائك، بدون ما تحس إنك مجبور تدرس كل شي لحاله.', type: _ArtType.path),
+  ];
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  void next() {
+    if (index == slides.length - 1) {
+      widget.onContinue();
+      return;
+    }
+    controller.nextPage(duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic);
   }
 
   @override
   Widget build(BuildContext context) {
-    const primary = Color(0xFF4B3F8F);
-    const inkSoft = Color(0xFF635C7A);
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF6F3EF),
+        backgroundColor: _bg,
         body: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(24, 38, 24, 28),
-            children: [
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Container(width: 46, height: 46, decoration: const BoxDecoration(color: primary, shape: BoxShape.circle), child: const Icon(Icons.forum_outlined, color: Colors.white, size: 24)),
-                Text('حوار App', style: arabic(15, weight: FontWeight.w700, color: inkSoft)),
-              ]),
-              const SizedBox(height: 44),
-              Container(
-                padding: const EdgeInsets.fromLTRB(22, 30, 22, 28),
-                decoration: BoxDecoration(color: primary, borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: primary.withOpacity(.22), blurRadius: 28, offset: const Offset(0, 14))]),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Container(width: 52, height: 52, decoration: BoxDecoration(color: Colors.white.withOpacity(.14), borderRadius: BorderRadius.circular(17)), child: const Icon(Icons.graphic_eq_rounded, color: Colors.white, size: 28)),
-                  const SizedBox(height: 24),
-                  Text('كل محادثة\nتقربك أكثر.', style: arabic(29, weight: FontWeight.w800, color: Colors.white).copyWith(height: 1.25)),
-                  const SizedBox(height: 12),
-                  Text('مارسي الإنجليزية بصوتك، خذي ملاحظاتك، وشوفي تقدمك بطريقة تشبهك.', style: arabic(14, color: Colors.white.withOpacity(.82)).copyWith(height: 1.65)),
-                ]),
-              ),
-              const SizedBox(height: 26),
-              Text('تجربة تعلم أهدأ وأوضح', style: arabic(16, weight: FontWeight.w700)),
-              const SizedBox(height: 14),
-              _Benefit(icon: Icons.mic_none_rounded, title: 'تحدثي بلا تردد', text: 'محادثات صوتية تساعدك على بناء الثقة يومًا بعد يوم.'),
-              _Benefit(icon: Icons.auto_awesome_outlined, title: 'اقتراحات تناسب مستواك', text: 'محتوى عملي يركز على ما تحتاجينه الآن.'),
-              _Benefit(icon: Icons.insights_outlined, title: 'شاهدي تقدمك', text: 'ملف شخصي واضح يحفظ أهدافك وتطورك.'),
-              const SizedBox(height: 18),
-              FilledButton(onPressed: onContinue, style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.all(17), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: Text('ابدئي رحلتك', style: arabic(15, weight: FontWeight.w700, color: Colors.white))),
-              const SizedBox(height: 10),
-              Text('يأخذ أقل من دقيقة للبدء', textAlign: TextAlign.center, style: arabic(11, color: inkSoft)),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+            child: Column(
+              children: [
+                Align(alignment: Alignment.centerLeft, child: TextButton(onPressed: widget.onContinue, child: Text('تخطي', style: _ar(12.5, color: _inkFaint, weight: FontWeight.w600)))),
+                Expanded(child: PageView.builder(controller: controller, itemCount: slides.length, onPageChanged: (value) => setState(() => index = value), itemBuilder: (_, i) => slides[i])),
+                Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(slides.length, (i) => AnimatedContainer(duration: const Duration(milliseconds: 180), margin: const EdgeInsets.symmetric(horizontal: 3), width: i == index ? 18 : 6, height: 6, decoration: BoxDecoration(color: i == index ? _primary : const Color(0xFFE6E1DA), borderRadius: BorderRadius.circular(5))))),
+                const SizedBox(height: 20),
+                SizedBox(width: double.infinity, child: FilledButton(onPressed: next, style: FilledButton.styleFrom(backgroundColor: _primary, padding: const EdgeInsets.all(16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: Text(index == slides.length - 1 ? 'ابدئي رحلتك' : 'التالي', style: _ar(14.5, color: Colors.white, weight: FontWeight.w700)))),
+              ],
+            ),
           ),
         ),
       ),
@@ -56,19 +71,50 @@ class WelcomeScreen extends StatelessWidget {
   }
 }
 
-class _Benefit extends StatelessWidget {
-  final IconData icon;
+enum _ArtType { voice, feedback, path }
+
+class _WelcomeSlide extends StatelessWidget {
   final String title;
   final String text;
-  const _Benefit({required this.icon, required this.title, required this.text});
+  final _ArtType type;
+  const _WelcomeSlide({required this.title, required this.text, required this.type});
+
+  @override
+  Widget build(BuildContext context) => Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+    _WelcomeArt(type: type),
+    const SizedBox(height: 14),
+    Text(title, textAlign: TextAlign.center, style: _ar(18, weight: FontWeight.w800)),
+    const SizedBox(height: 8),
+    ConstrainedBox(constraints: const BoxConstraints(maxWidth: 280), child: Text(text, textAlign: TextAlign.center, style: _ar(13, color: _inkSoft).copyWith(height: 1.7))),
+  ]);
+}
+
+class _WelcomeArt extends StatelessWidget {
+  final _ArtType type;
+  const _WelcomeArt({required this.type});
 
   @override
   Widget build(BuildContext context) {
-    final style = GoogleFonts.ibmPlexSansArabic;
-    return Padding(padding: const EdgeInsets.only(bottom: 12), child: Row(children: [
-      Container(width: 44, height: 44, decoration: BoxDecoration(color: const Color(0xFFE8E3F4), borderRadius: BorderRadius.circular(14)), child: Icon(icon, color: const Color(0xFF4B3F8F), size: 21)),
-      const SizedBox(width: 12),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: style(fontSize: 13.5, fontWeight: FontWeight.w700, color: const Color(0xFF241F38))), const SizedBox(height: 2), Text(text, style: style(fontSize: 11.5, color: const Color(0xFF948DA6)))])),
+    final background = type == _ArtType.voice ? _primaryTint : type == _ArtType.feedback ? const Color(0xFFF6E6EB) : const Color(0xFFE9E7F2);
+    return SizedBox(width: 240, height: 200, child: Stack(alignment: Alignment.center, children: [
+      Container(width: 190, height: 168, decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(78))),
+      if (type == _ArtType.voice) ...[
+        Container(width: 92, height: 92, decoration: const BoxDecoration(color: _primary, shape: BoxShape.circle), child: const Icon(Icons.mic_none_rounded, color: Colors.white, size: 42)),
+        const Positioned(right: 24, top: 30, child: Icon(Icons.chat_bubble_outline_rounded, color: _coral, size: 42)),
+        const Positioned(right: 66, top: 15, child: Icon(Icons.circle, color: _coral, size: 8)),
+        const Positioned(right: 46, top: 8, child: Icon(Icons.circle, color: _amber, size: 5)),
+        Positioned(left: 34, bottom: 32, child: Row(children: [Container(width: 42, height: 3, color: _coral.withOpacity(.55)), const SizedBox(width: 5), Container(width: 4, height: 4, decoration: const BoxDecoration(color: _coral, shape: BoxShape.circle))])),
+      ] else if (type == _ArtType.feedback) ...[
+        Container(width: 126, height: 98, decoration: BoxDecoration(color: _paper, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFEFDBE2), width: 1.4)), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Container(width: 76, height: 8, decoration: BoxDecoration(color: const Color(0xFFF8E7E6), borderRadius: BorderRadius.circular(4))), const SizedBox(height: 10), Container(width: 88, height: 8, decoration: BoxDecoration(color: _primaryTint, borderRadius: BorderRadius.circular(4))), const SizedBox(height: 10), Container(width: 54, height: 8, decoration: BoxDecoration(color: _primaryTint, borderRadius: BorderRadius.circular(4)))])),
+        const Positioned(right: 28, top: 25, child: CircleAvatar(radius: 22, backgroundColor: _primary, child: Icon(Icons.check_rounded, color: Colors.white, size: 28))),
+        const Positioned(left: 28, bottom: 20, child: Icon(Icons.edit_outlined, color: _amber, size: 38)),
+      ] else ...[
+        Positioned(bottom: 28, left: 44, right: 44, child: Row(crossAxisAlignment: CrossAxisAlignment.end, mainAxisAlignment: MainAxisAlignment.center, children: [Container(width: 24, height: 42, decoration: BoxDecoration(color: const Color(0xFFB9B4D6), borderRadius: BorderRadius.circular(6))), const SizedBox(width: 12), Container(width: 24, height: 64, decoration: BoxDecoration(color: const Color(0xFF8C82BE), borderRadius: BorderRadius.circular(6))), const SizedBox(width: 12), Container(width: 24, height: 88, decoration: BoxDecoration(color: _primary, borderRadius: BorderRadius.circular(6)))])),
+        const Positioned(right: 46, top: 25, child: Icon(Icons.star_rounded, color: _amber, size: 30)),
+        const Positioned(left: 34, top: 44, child: Icon(Icons.circle, color: _coral, size: 7)),
+      ],
     ]));
   }
 }
+
+TextStyle _ar(double size, {FontWeight weight = FontWeight.w400, Color color = _ink}) => GoogleFonts.ibmPlexSansArabic(fontSize: size, fontWeight: weight, color: color);
