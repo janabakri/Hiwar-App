@@ -33,3 +33,24 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 إذا لم تُضبط Google credentials بعد، استخدمي «دخول» اليدوي مؤقتًا لاختبار onboarding وحفظ الملف الشخصي.
+
+## Sign up والتحقق بالبريد
+
+أضيفت المسارات التالية:
+
+```text
+POST /api/v1/auth/sign-up
+POST /api/v1/auth/verify-email
+```
+
+لتفعيل الإرسال الحقيقي، أضيفي هذه القيم إلى `Backend/.env` دون رفع الملف إلى GitHub:
+
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-google-app-password
+SMTP_FROM=your-email@gmail.com
+```
+
+في Gmail استخدمي App Password مع تفعيل التحقق بخطوتين، وليس كلمة مرور الحساب الأساسية. إذا لم تضبطي SMTP وكان `DEBUG=True`، يعرض Backend رمز التطوير في استجابة Sign up لتسهيل الاختبار المحلي فقط. في الإنتاج يجب تعطيل DEBUG وعدم إظهار الرمز للعميل.
