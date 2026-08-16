@@ -105,10 +105,226 @@ class HomeContent extends StatelessWidget {
 
 class _MistakeChip extends StatelessWidget { final String wrong, correct, category; const _MistakeChip({required this.wrong, required this.correct, required this.category}); @override Widget build(BuildContext context) => Container(width: 158, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: rustTint, border: Border.all(color: const Color(0xFFEAD3CC)), borderRadius: BorderRadius.circular(12)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(wrong, style: en(12.5, weight: FontWeight.w600, color: rust).copyWith(decoration: TextDecoration.lineThrough)), Text(correct, style: en(12.5, weight: FontWeight.w600, color: primaryDark)), const Spacer(), Text(category, style: ar(10.5, color: inkFaint))])); }
 
-class VoiceScreen extends StatefulWidget { final HiwarApi api; const VoiceScreen({super.key, required this.api}); @override State<VoiceScreen> createState() => _VoiceScreenState(); }
-class _VoiceScreenState extends State<VoiceScreen> { String status = 'اضغط للبدء بالحديث'; bool active = false; Timer? timer; int seconds = 0; @override void dispose(){timer?.cancel(); super.dispose();} void toggle(){ if(!active){setState((){active=true; status='أنصت إليك...'; seconds=0;}); timer=Timer.periodic(const Duration(seconds:1),(_){setState(()=>seconds++);});} else {timer?.cancel(); setState(()=>status='لحظة، يفكر بالرد...'); Future.delayed(const Duration(milliseconds:1100),(){if(!mounted)return; setState(()=>status='يتحدث الآن...'); Future.delayed(const Duration(milliseconds:2200),(){if(mounted)setState(()=>status='اضغط للمتابعة');});});} } @override Widget build(BuildContext context)=>Scaffold(backgroundColor:bg, appBar: AppBar(backgroundColor:bg,elevation:0, leading:IconButton(icon:const Icon(Icons.close,color:ink),onPressed:()=>Navigator.pop(context)), title:Text('B1 · Ordering food at a restaurant',style:ar(12,color:inkFaint))), body:Column(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[Column(children:[const SizedBox(height:60),Text(status,style:ar(13.5,weight:FontWeight.w600,color:inkSoft)),const SizedBox(height:22),Container(width:190,height:190,decoration:const BoxDecoration(shape:BoxShape.circle,gradient:RadialGradient(center:Alignment(-.3,-.45),colors:[Color(0xFF6459A8),primary])),child:Center(child:active?Row(mainAxisSize:MainAxisSize.min,children:List.generate(6,(i)=>Container(width:5,height:28+(i%3)*10,margin:const EdgeInsets.symmetric(horizontal:2),decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(4))))):const Icon(Icons.mic_none,size:40,color:Colors.white))),const SizedBox(height:22),Text('${(seconds~/60).toString().padLeft(2,'0')}:${(seconds%60).toString().padLeft(2,'0')}',style:mono(13,color:inkFaint))]), Padding(padding:const EdgeInsets.only(bottom:32),child:Row(mainAxisAlignment:MainAxisAlignment.center,children:[Column(children:[IconButton(onPressed:toggle,icon:const Icon(Icons.mic_none),iconSize:26,style:IconButton.styleFrom(backgroundColor:paper,side:const BorderSide(color:line),fixedSize:const Size(64,64))),Text('اضغط وتحدث',style:ar(11.5,color:inkFaint))]),const SizedBox(width:34),Column(children:[IconButton(onPressed:()=>Navigator.pushReplacement(context,MaterialPageRoute(builder:(_)=>FeedbackScreen(api:widget.api))),icon:const Icon(Icons.close),color:Colors.white,iconSize:26,style:IconButton.styleFrom(backgroundColor:rust,fixedSize:const Size(64,64))),Text('إنهاء',style:ar(11.5,color:inkFaint))])]))]); }
+class VoiceScreen extends StatefulWidget {
+  final HiwarApi api;
+  const VoiceScreen({super.key, required this.api});
 
-class FeedbackScreen extends StatelessWidget { final HiwarApi api; const FeedbackScreen({super.key,required this.api}); @override Widget build(BuildContext context)=>Scaffold(backgroundColor:bg,appBar:AppBar(backgroundColor:bg,elevation:0,title:Text('مراجعة المحادثة',style:ar(16,weight:FontWeight.w700))),body:ListView(padding:const EdgeInsets.fromLTRB(20,8,20,30),children:[Center(child:Container(padding:const EdgeInsets.symmetric(horizontal:14,vertical:6),decoration:BoxDecoration(color:primaryTint,borderRadius:BorderRadius.circular(20)),child:Text('✓ انتهت المحادثة',style:ar(12,weight:FontWeight.w700,color:primaryDark)))),Center(child:Padding(padding:const EdgeInsets.only(top:12),child:Text('أداء جيد اليوم',style:ar(18,weight:FontWeight.w700)))),Center(child:Text('4 دقائق · Ordering food at a restaurant',style:ar(12.5,color:inkFaint))),const _SectionTitle('أهم الأخطاء'),const _ReviewCard(number:'1',wrong:'I want to ordering a pizza',correct:'I want to order a pizza',explain:'بعد want to نستخدم الفعل بصورته الأساسية (order) وليس صورة ing.'),const _ReviewCard(number:'2',wrong:'since three years',correct:'for three years',explain:'نستخدم for مع مدة زمنية، وsince مع نقطة بداية محددة.'),const _ReviewCard(number:'3',wrong:'I think — نُطقت /sɪŋk/',correct:'النطق الصحيح: /θɪŋk/',explain:'ضعي طرف اللسان بين الأسنان مع خروج الهواء.'),const _SectionTitle('كلمات جديدة استخدمتِها'),Wrap(spacing:8,runSpacing:8,children:const [_WordChip('recommend — يوصي'),_WordChip('medium-rare — نصف نضج'),_WordChip('to go — للتغليف')]),const SizedBox(height:22),FilledButton.icon(onPressed:()=>Navigator.pop(context),icon:const Icon(Icons.bolt),label:Text('العودة للمحادثة',style:ar(14,weight:FontWeight.w700)),style:FilledButton.styleFrom(backgroundColor:primary,padding:const EdgeInsets.all(16))) ]); }
+  @override
+  State<VoiceScreen> createState() => _VoiceScreenState();
+}
+
+class _VoiceScreenState extends State<VoiceScreen> {
+  String status = 'اضغط للبدء بالحديث';
+  bool active = false;
+  Timer? timer;
+  int seconds = 0;
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
+  }
+
+  void toggle() {
+    if (!active) {
+      setState(() {
+        active = true;
+        status = 'أنصت إليك...';
+        seconds = 0;
+      });
+      timer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => seconds++);
+      });
+      return;
+    }
+
+    timer?.cancel();
+    setState(() => status = 'لحظة، يفكر بالرد...');
+    Future.delayed(const Duration(milliseconds: 1100), () {
+      if (!mounted) return;
+      setState(() => status = 'يتحدث الآن...');
+      Future.delayed(const Duration(milliseconds: 2200), () {
+        if (mounted) setState(() => status = 'اضغط للمتابعة');
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final elapsed = '${(seconds ~/ 60).toString().padLeft(2, '0')}:${(seconds % 60).toString().padLeft(2, '0')}';
+    return Scaffold(
+      backgroundColor: bg,
+      appBar: AppBar(
+        backgroundColor: bg,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: ink),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text('B1 · Ordering food at a restaurant', style: ar(12, color: inkFaint)),
+      ),
+      body: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            children: [
+              const SizedBox(height: 60),
+              Text(status, style: ar(13.5, weight: FontWeight.w600, color: inkSoft)),
+              const SizedBox(height: 22),
+              Container(
+                width: 190,
+                height: 190,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    center: Alignment(-.3, -.45),
+                    colors: [Color(0xFF6459A8), primary],
+                  ),
+                ),
+                child: Center(
+                  child: active
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: List.generate(
+                            6,
+                            (i) => Container(
+                              width: 5,
+                              height: 28 + (i % 3) * 10,
+                              margin: const EdgeInsets.symmetric(horizontal: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ),
+                        )
+                      : const Icon(Icons.mic_none, size: 40, color: Colors.white),
+                ),
+              ),
+              const SizedBox(height: 22),
+              Text(elapsed, style: mono(13, color: inkFaint)),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 32),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Column(
+                  children: [
+                    IconButton(
+                      onPressed: toggle,
+                      icon: const Icon(Icons.mic_none),
+                      iconSize: 26,
+                      style: IconButton.styleFrom(
+                        backgroundColor: paper,
+                        side: const BorderSide(color: line),
+                        fixedSize: const Size(64, 64),
+                      ),
+                    ),
+                    Text('اضغط وتحدث', style: ar(11.5, color: inkFaint)),
+                  ],
+                ),
+                const SizedBox(width: 34),
+                Column(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => FeedbackScreen(api: widget.api)),
+                      ),
+                      icon: const Icon(Icons.close),
+                      color: Colors.white,
+                      iconSize: 26,
+                      style: IconButton.styleFrom(
+                        backgroundColor: rust,
+                        fixedSize: const Size(64, 64),
+                      ),
+                    ),
+                    Text('إنهاء', style: ar(11.5, color: inkFaint)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class FeedbackScreen extends StatelessWidget {
+  final HiwarApi api;
+  const FeedbackScreen({super.key, required this.api});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: bg,
+      appBar: AppBar(
+        backgroundColor: bg,
+        elevation: 0,
+        title: Text('مراجعة المحادثة', style: ar(16, weight: FontWeight.w700)),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
+        children: [
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(20)),
+              child: Text('✓ انتهت المحادثة', style: ar(12, weight: FontWeight.w700, color: primaryDark)),
+            ),
+          ),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text('أداء جيد اليوم', style: ar(18, weight: FontWeight.w700)),
+            ),
+          ),
+          Center(child: Text('4 دقائق · Ordering food at a restaurant', style: ar(12.5, color: inkFaint))),
+          const _SectionTitle('أهم الأخطاء'),
+          const _ReviewCard(
+            number: '1',
+            wrong: 'I want to ordering a pizza',
+            correct: 'I want to order a pizza',
+            explain: 'بعد want to نستخدم الفعل بصورته الأساسية (order) وليس صورة ing.',
+          ),
+          const _ReviewCard(
+            number: '2',
+            wrong: 'since three years',
+            correct: 'for three years',
+            explain: 'نستخدم for مع مدة زمنية، وsince مع نقطة بداية محددة.',
+          ),
+          const _ReviewCard(
+            number: '3',
+            wrong: 'I think — نُطقت /sɪŋk/',
+            correct: 'النطق الصحيح: /θɪŋk/',
+            explain: 'ضعي طرف اللسان بين الأسنان مع خروج الهواء.',
+          ),
+          const _SectionTitle('كلمات جديدة استخدمتِها'),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: const [
+              _WordChip('recommend — يوصي'),
+              _WordChip('medium-rare — نصف نضج'),
+              _WordChip('to go — للتغليف'),
+            ],
+          ),
+          const SizedBox(height: 22),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.bolt),
+            label: Text('العودة للمحادثة', style: ar(14, weight: FontWeight.w700)),
+            style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.all(16)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ReviewCard extends StatelessWidget {final String number,wrong,correct,explain;const _ReviewCard({required this.number,required this.wrong,required this.correct,required this.explain});@override Widget build(BuildContext context)=>Padding(padding:const EdgeInsets.only(bottom:12),child:_Card(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(children:[CircleAvatar(radius:12,backgroundColor:rustTint,child:Text(number,style:mono(11,color:rust))),const SizedBox(width:10),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('"$wrong"',style:en(13.5,color:rust).copyWith(decoration:TextDecoration.lineThrough)),Text('✓ $correct',style:en(13.5,weight:FontWeight.w600,color:primaryDark))]))]),const Divider(height:20,color:line),Text(explain,style:ar(12.5,color:inkSoft).copyWith(height:1.7))])));}
 class _WordChip extends StatelessWidget {final String text;const _WordChip(this.text);@override Widget build(BuildContext context)=>Container(padding:const EdgeInsets.symmetric(horizontal:13,vertical:8),decoration:BoxDecoration(color:paper,border:Border.all(color:line),borderRadius:BorderRadius.circular(20)),child:Text(text,style:ar(12.5)));}
 
