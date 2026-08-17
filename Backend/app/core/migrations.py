@@ -14,6 +14,8 @@ def ensure_user_profile_columns(engine) -> None:
         "education_level": "VARCHAR(80)",
         "certificates": "TEXT",
         "learning_reason": "TEXT",
+        "daily_minutes": "INTEGER",
+        "focus_skills": "TEXT",
         "profile_complete": "BOOLEAN NOT NULL DEFAULT 0",
         "password_hash": "VARCHAR(255)",
         "verification_code": "VARCHAR(10)",

@@ -43,6 +43,7 @@ class _AuthGateState extends State<AuthGate> {
   HiwarProfile? profile;
   bool loading = true;
   bool welcomeSeen = false;
+  bool needsLevelCheck = false;
 
   @override void initState() { super.initState(); _restore(); }
 
@@ -57,11 +58,14 @@ class _AuthGateState extends State<AuthGate> {
 
   void _signedIn(HiwarProfile next) => setState(() => profile = next);
 
+  void _onOnboardingComplete(HiwarProfile next) => setState(() { profile = next; needsLevelCheck = true; });
+
   @override Widget build(BuildContext context) {
     if (loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (profile == null && !welcomeSeen) return WelcomeScreen(onContinue: () async { await api.markWelcomeSeen(); if (mounted) setState(() => welcomeSeen = true); });
     if (profile == null) return AuthScreen(api: api, onSignedIn: _signedIn);
-    if (!profile!.profileComplete) return OnboardingScreen(api: api, profile: profile!, onComplete: _signedIn);
+    if (!profile!.profileComplete) return OnboardingScreen(api: api, profile: profile!, onComplete: _onOnboardingComplete);
+    if (needsLevelCheck) return LevelCheckScreen(onComplete: () => setState(() => needsLevelCheck = false));
     return HomeScreen(profile: profile);
   }
 }
