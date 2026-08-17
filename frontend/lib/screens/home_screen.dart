@@ -256,8 +256,34 @@ class _VoiceScreenState extends State<VoiceScreen> {
             Container(
               width: 190,
               height: 190,
-              decoration: const BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(center: Alignment(-.3, -.45), colors: [Color(0xFF6459A8), primary])),
-              child: Center(child: sending ? const CircularProgressIndicator(color: Colors.white) : listening ? Row(mainAxisSize: MainAxisSize.min, children: List.generate(6, (i) => Container(width: 5, height: 28 + (i % 3) * 10, margin: const EdgeInsets.symmetric(horizontal: 2), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)))) : const Icon(Icons.mic_none, size: 40, color: Colors.white)),
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  center: Alignment(-.3, -.45),
+                  colors: [Color(0xFF6459A8), primary],
+                ),
+              ),
+              child: Center(
+                child: sending
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : listening
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: List.generate(
+                              6,
+                              (i) => Container(
+                                width: 5,
+                                height: 28 + (i % 3) * 10,
+                                margin: const EdgeInsets.symmetric(horizontal: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                            ),
+                          )
+                        : const Icon(Icons.mic_none, size: 40, color: Colors.white),
+              ),
             ),
             const SizedBox(height: 22),
             if (transcript.isNotEmpty) Padding(padding: const EdgeInsets.symmetric(horizontal: 26), child: Text(transcript, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: ar(12, color: inkSoft))),
@@ -576,7 +602,38 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
       if (section < 2) ...[
         Text('السؤال ${question + 1} من 5', textAlign: TextAlign.center, style: ar(12, color: inkFaint)),
         const SizedBox(height: 16),
-        _Card(child: Column(children: [Text('${currentQuestions[question]['q']}', textAlign: TextAlign.center, style: en(18, weight: FontWeight.w700)), const SizedBox(height: 18), ...List.generate(3, (i) => Padding(padding: const EdgeInsets.only(bottom: 10), child: SizedBox(width: double.infinity, child: OutlinedButton(onPressed: () => answer(i), style: OutlinedButton.styleFrom(padding: const EdgeInsets.all(14), side: const BorderSide(color: line)), child: Text('${(currentQuestions[question]['a'] as List)[i]}', style: en(14, color: ink)))))])),
+        _Card(
+          child: Column(
+            children: [
+              Text(
+                '${currentQuestions[question]['q']}',
+                textAlign: TextAlign.center,
+                style: en(18, weight: FontWeight.w700),
+              ),
+              const SizedBox(height: 18),
+              ...List.generate(
+                3,
+                (i) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () => answer(i),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.all(14),
+                        side: const BorderSide(color: line),
+                      ),
+                      child: Text(
+                        '${(currentQuestions[question]['a'] as List)[i]}',
+                        style: en(14, color: ink),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ] else if (isReading) ...[
         Text('اقرئي القطعة ثم أجيبي عن السؤال.', style: ar(14, weight: FontWeight.w700)), const SizedBox(height: 12), _Card(child: Text('Learning a language takes practice. Small daily conversations can help you become more confident and understand people from different cultures.', style: en(15, color: inkSoft).copyWith(height: 1.7))), const SizedBox(height: 14), _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('What helps you become more confident?', style: en(15, weight: FontWeight.w700)), const SizedBox(height: 12), ...['Small daily conversations', 'Watching no videos', 'Avoiding practice'].map((item) => ListTile(contentPadding: EdgeInsets.zero, title: Text(item, style: en(13)), onTap: () => submitReading(item)))])),
       ] else if (isListening) ...[
