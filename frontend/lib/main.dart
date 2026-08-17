@@ -51,21 +51,35 @@ class _AuthGateState extends State<AuthGate> {
     welcomeSeen = await api.hasSeenWelcome();
     final userId = await api.getStoredUserId();
     if (userId != null && userId.isNotEmpty) {
-      try { profile = await api.getProfile(userId); } catch (_) { profile = null; }
+      try {
+        profile = await api.getProfile(userId);
+        needsLevelCheck = profile!.levelScore <= 0 || profile!.level.toLowerCase() == 'pending' || profile!.level.toLowerCase() == 'intermediate';
+      } catch (_) { profile = null; }
     }
     if (mounted) setState(() => loading = false);
   }
 
-  void _signedIn(HiwarProfile next) => setState(() => profile = next);
+  void _signedIn(HiwarProfile next) => setState(() { profile = next; needsLevelCheck = next.levelScore <= 0 || next.level.toLowerCase() == 'pending' || next.level.toLowerCase() == 'intermediate'; });
 
   void _onOnboardingComplete(HiwarProfile next) => setState(() { profile = next; needsLevelCheck = true; });
+
+  Future<void> _onLevelComplete() async {
+    final id = profile?.userId;
+    if (id == null) return;
+    try {
+      final updated = await api.getProfile(id);
+      if (mounted) setState(() { profile = updated; needsLevelCheck = false; });
+    } catch (_) {
+      if (mounted) setState(() => needsLevelCheck = false);
+    }
+  }
 
   @override Widget build(BuildContext context) {
     if (loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (profile == null && !welcomeSeen) return WelcomeScreen(onContinue: () async { await api.markWelcomeSeen(); if (mounted) setState(() => welcomeSeen = true); });
     if (profile == null) return AuthScreen(api: api, onSignedIn: _signedIn);
     if (!profile!.profileComplete) return OnboardingScreen(api: api, profile: profile!, onComplete: _onOnboardingComplete);
-    if (needsLevelCheck) return LevelCheckScreen(api: api, userId: profile!.userId, onComplete: () => setState(() => needsLevelCheck = false));
+    if (needsLevelCheck) return LevelCheckScreen(api: api, userId: profile!.userId, onComplete: _onLevelComplete);
     return HomeScreen(profile: profile);
   }
 }
