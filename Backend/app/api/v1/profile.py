@@ -4,6 +4,7 @@ The current app uses a trusted client user_id; production Google token verificat
 should be added before exposing this API publicly.
 """
 from datetime import datetime, timedelta
+from jose import jwt
 from typing import Optional
 import base64
 import hashlib
@@ -37,6 +38,11 @@ class SignUpRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
 
 
+class PasswordSignInRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=150)
+    password: str = Field(min_length=8, max_length=128)
+
+
 class VerifyEmailRequest(BaseModel):
     email: str = Field(min_length=5, max_length=150)
     code: str = Field(min_length=6, max_length=6)
@@ -57,6 +63,22 @@ def _hash_password(password: str) -> str:
     salt = secrets.token_bytes(16)
     digest = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 120_000)
     return base64.urlsafe_b64encode(salt + digest).decode()
+
+
+def _verify_password(password: str, encoded: str) -> bool:
+    try:
+        raw = base64.urlsafe_b64decode(encoded.encode())
+        salt, expected = raw[:16], raw[16:]
+        actual = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 120_000)
+        return hmac.compare_digest(actual, expected)
+    except (ValueError, TypeError):
+        return False
+
+
+def _issue_token(user: User) -> str:
+    now = datetime.utcnow()
+    payload = {"sub": user.user_id, "email": user.email, "iat": now, "exp": now + timedelta(hours=24)}
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
 
 def _send_verification_email(email: str, code: str) -> bool:
@@ -131,7 +153,27 @@ def verify_email(request: VerifyEmailRequest, db: Session = Depends(get_db)):
     user.last_active = datetime.utcnow()
     db.commit()
     db.refresh(user)
-    return _serialize(user)
+    result = _serialize(user)
+    result["access_token"] = _issue_token(user)
+    result["token_type"] = "bearer"
+    return result
+
+
+@router.post("/auth/password-sign-in")
+def password_sign_in(request: PasswordSignInRequest, db: Session = Depends(get_db)):
+    email = request.email.strip().lower()
+    user = db.query(User).filter(User.email == email).first()
+    if not user or not user.password_hash or not _verify_password(request.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="البريد أو كلمة المرور غير صحيحة")
+    if not user.email_verified:
+        raise HTTPException(status_code=403, detail="تحققي من بريدك الإلكتروني أولًا")
+    user.last_active = datetime.utcnow()
+    db.commit()
+    db.refresh(user)
+    result = _serialize(user)
+    result["access_token"] = _issue_token(user)
+    result["token_type"] = "bearer"
+    return result
 
 
 @router.post("/auth/sign-in")
@@ -147,7 +189,10 @@ def sign_in(request: SignInRequest, db: Session = Depends(get_db)):
     user.last_active = datetime.utcnow()
     db.commit()
     db.refresh(user)
-    return _serialize(user)
+    result = _serialize(user)
+    result["access_token"] = _issue_token(user)
+    result["token_type"] = "bearer"
+    return result
 
 
 @router.get("/profile/{user_id}")
