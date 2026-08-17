@@ -2,6 +2,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter_tts/flutter_tts.dart';
 import '../services/hiwar_api.dart';
 
 const bg = Color(0xFFF6F3EF);
@@ -117,39 +119,120 @@ class VoiceScreen extends StatefulWidget {
 }
 
 class _VoiceScreenState extends State<VoiceScreen> {
-  String status = 'اضغط للبدء بالحديث';
-  bool active = false;
+  final stt.SpeechToText speech = stt.SpeechToText();
+  final FlutterTts tts = FlutterTts();
   Timer? timer;
   int seconds = 0;
+  bool active = false;
+  bool listening = false;
+  bool sending = false;
+  String status = 'اضغط للبدء بالحديث';
+  String transcript = '';
+  final List<Map<String, String>> corrections = [];
+  String reply = '';
+  List<String> tips = const [];
+  int exchanges = 0;
 
   @override
   void dispose() {
     timer?.cancel();
+    speech.stop();
+    tts.stop();
     super.dispose();
   }
 
-  void toggle() {
-    if (!active) {
-      setState(() {
-        active = true;
-        status = 'أنصت إليك...';
-        seconds = 0;
-      });
-      timer = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (mounted) setState(() => seconds++);
-      });
+  Future<void> toggleListening() async {
+    if (sending) return;
+    if (listening) {
+      await speech.stop();
+      if (mounted) setState(() { listening = false; status = 'جاري تحليل كلامك...'; });
+      await sendTranscript();
       return;
     }
 
-    timer?.cancel();
-    setState(() => status = 'لحظة، يفكر بالرد...');
-    Future.delayed(const Duration(milliseconds: 1100), () {
-      if (!mounted) return;
-      setState(() => status = 'يتحدث الآن...');
-      Future.delayed(const Duration(milliseconds: 2200), () {
-        if (mounted) setState(() => status = 'اضغط للمتابعة');
-      });
+    final available = await speech.initialize(
+      onStatus: (value) {
+        if (!mounted) return;
+        if (value == 'done' && listening) setState(() => listening = false);
+      },
+      onError: (_) {
+        if (mounted) setState(() { listening = false; status = 'تعذر الوصول للميكروفون'; });
+      },
+    );
+    if (!available) {
+      if (mounted) setState(() => status = 'اسمحي للتطبيق باستخدام الميكروفون');
+      return;
+    }
+    setState(() {
+      active = true;
+      listening = true;
+      status = 'أنصت إليك...';
+      transcript = '';
     });
+    timer ??= Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => seconds++);
+    });
+    await speech.listen(
+      localeId: 'en_US',
+      listenMode: stt.ListenMode.dictation,
+      onResult: (result) {
+        if (!mounted) return;
+        setState(() => transcript = result.recognizedWords);
+        if (result.finalResult) {
+          setState(() { listening = false; status = 'جاري تحليل كلامك...'; });
+          sendTranscript();
+        }
+      },
+    );
+  }
+
+  Future<void> sendTranscript() async {
+    final message = transcript.trim();
+    if (message.isEmpty) {
+      if (mounted) setState(() => status = 'حاولي قول جملة قصيرة بالإنجليزي');
+      return;
+    }
+    setState(() { sending = true; status = 'يفكر بالرد...'; });
+    try {
+      final userId = await widget.api.getStoredUserId() ?? await widget.api.getUserId();
+      final result = await widget.api.sendChat(userId: userId, message: message);
+      if (!mounted) return;
+      setState(() {
+        reply = result.reply;
+        corrections
+          ..clear()
+          ..addAll(result.corrections);
+        tips = result.tips;
+        exchanges++;
+        sending = false;
+        active = true;
+        status = 'يتحدث الآن...';
+      });
+      await tts.setLanguage('en-US');
+      await tts.setSpeechRate(0.45);
+      if (result.reply.trim().isNotEmpty) await tts.speak(result.reply);
+    } catch (_) {
+      if (mounted) setState(() { sending = false; status = 'تعذر الاتصال بالخادم'; });
+    }
+  }
+
+  void finishConversation() {
+    timer?.cancel();
+    speech.stop();
+    tts.stop();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FeedbackScreen(
+          api: widget.api,
+          corrections: List<Map<String, String>>.from(corrections),
+          reply: reply,
+          tips: tips,
+          duration: seconds,
+          exchanges: exchanges,
+        ),
+      ),
+    );
   }
 
   @override
@@ -160,95 +243,34 @@ class _VoiceScreenState extends State<VoiceScreen> {
       appBar: AppBar(
         backgroundColor: bg,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: ink),
-          onPressed: () => Navigator.pop(context),
-        ),
+        leading: IconButton(icon: const Icon(Icons.close, color: ink), onPressed: () => Navigator.pop(context)),
         title: Text('B1 · Ordering food at a restaurant', style: ar(12, color: inkFaint)),
       ),
       body: Column(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            children: [
-              const SizedBox(height: 60),
-              Text(status, style: ar(13.5, weight: FontWeight.w600, color: inkSoft)),
-              const SizedBox(height: 22),
-              Container(
-                width: 190,
-                height: 190,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    center: Alignment(-.3, -.45),
-                    colors: [Color(0xFF6459A8), primary],
-                  ),
-                ),
-                child: Center(
-                  child: active
-                      ? Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: List.generate(
-                            6,
-                            (i) => Container(
-                              width: 5,
-                              height: 28 + (i % 3) * 10,
-                              margin: const EdgeInsets.symmetric(horizontal: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                          ),
-                        )
-                      : const Icon(Icons.mic_none, size: 40, color: Colors.white),
-                ),
-              ),
-              const SizedBox(height: 22),
-              Text(elapsed, style: mono(13, color: inkFaint)),
-            ],
-          ),
+          Column(children: [
+            const SizedBox(height: 60),
+            Text(status, style: ar(13.5, weight: FontWeight.w600, color: inkSoft)),
+            const SizedBox(height: 22),
+            Container(
+              width: 190,
+              height: 190,
+              decoration: const BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(center: Alignment(-.3, -.45), colors: [Color(0xFF6459A8), primary])),
+              child: Center(child: sending ? const CircularProgressIndicator(color: Colors.white) : listening ? Row(mainAxisSize: MainAxisSize.min, children: List.generate(6, (i) => Container(width: 5, height: 28 + (i % 3) * 10, margin: const EdgeInsets.symmetric(horizontal: 2), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)))) : const Icon(Icons.mic_none, size: 40, color: Colors.white)),
+            ),
+            const SizedBox(height: 22),
+            if (transcript.isNotEmpty) Padding(padding: const EdgeInsets.symmetric(horizontal: 26), child: Text(transcript, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: ar(12, color: inkSoft))),
+            const SizedBox(height: 8),
+            Text(elapsed, style: mono(13, color: inkFaint)),
+          ]),
           Padding(
             padding: const EdgeInsets.only(bottom: 32),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Column(
-                  children: [
-                    IconButton(
-                      onPressed: toggle,
-                      icon: const Icon(Icons.mic_none),
-                      iconSize: 26,
-                      style: IconButton.styleFrom(
-                        backgroundColor: paper,
-                        side: const BorderSide(color: line),
-                        fixedSize: const Size(64, 64),
-                      ),
-                    ),
-                    Text('اضغط وتحدث', style: ar(11.5, color: inkFaint)),
-                  ],
-                ),
-                const SizedBox(width: 34),
-                Column(
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (_) => FeedbackScreen(api: widget.api)),
-                      ),
-                      icon: const Icon(Icons.close),
-                      color: Colors.white,
-                      iconSize: 26,
-                      style: IconButton.styleFrom(
-                        backgroundColor: rust,
-                        fixedSize: const Size(64, 64),
-                      ),
-                    ),
-                    Text('إنهاء', style: ar(11.5, color: inkFaint)),
-                  ],
-                ),
-              ],
-            ),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Column(children: [IconButton(onPressed: toggleListening, icon: Icon(listening ? Icons.stop_rounded : Icons.mic_none, color: listening ? rust : ink), iconSize: 26, style: IconButton.styleFrom(backgroundColor: paper, side: const BorderSide(color: line), fixedSize: const Size(64, 64))), Text(listening ? 'إيقاف' : 'اضغط وتحدث', style: ar(11.5, color: inkFaint))]),
+              const SizedBox(width: 34),
+              Column(children: [IconButton(onPressed: finishConversation, icon: const Icon(Icons.close), color: Colors.white, iconSize: 26, style: IconButton.styleFrom(backgroundColor: rust, fixedSize: const Size(64, 64))), Text('إنهاء', style: ar(11.5, color: inkFaint))]),
+            ]),
           ),
         ],
       ),
@@ -258,73 +280,33 @@ class _VoiceScreenState extends State<VoiceScreen> {
 
 class FeedbackScreen extends StatelessWidget {
   final HiwarApi api;
-  const FeedbackScreen({super.key, required this.api});
+  final List<Map<String, String>> corrections;
+  final String reply;
+  final List<String> tips;
+  final int duration;
+  final int exchanges;
+  const FeedbackScreen({super.key, required this.api, this.corrections = const [], this.reply = '', this.tips = const [], this.duration = 0, this.exchanges = 0});
 
   @override
   Widget build(BuildContext context) {
+    final shown = corrections.isEmpty ? const [{'wrong': 'لا توجد أخطاء مسجلة بعد', 'correct': 'استمري بالمحاولة', 'explanation': 'سيرسل الخادم التصحيحات هنا بعد تحليل الكلام الحقيقي.'}] : corrections;
+    final minutes = duration ~/ 60;
+    final seconds = duration % 60;
     return Scaffold(
       backgroundColor: bg,
-      appBar: AppBar(
-        backgroundColor: bg,
-        elevation: 0,
-        title: Text('مراجعة المحادثة', style: ar(16, weight: FontWeight.w700)),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
-        children: [
-          const _FeedbackCelebration(),
-          Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(20)),
-              child: Text('✓ انتهت المحادثة', style: ar(12, weight: FontWeight.w700, color: primaryDark)),
-            ),
-          ),
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Text('أداء جيد اليوم', style: ar(18, weight: FontWeight.w700)),
-            ),
-          ),
-          Center(child: Text('4 دقائق · Ordering food at a restaurant', style: ar(12.5, color: inkFaint))),
-          const _SectionTitle('أهم الأخطاء'),
-          const _ReviewCard(
-            number: '1',
-            wrong: 'I want to ordering a pizza',
-            correct: 'I want to order a pizza',
-            explain: 'بعد want to نستخدم الفعل بصورته الأساسية (order) وليس صورة ing.',
-          ),
-          const _ReviewCard(
-            number: '2',
-            wrong: 'since three years',
-            correct: 'for three years',
-            explain: 'نستخدم for مع مدة زمنية، وsince مع نقطة بداية محددة.',
-          ),
-          const _ReviewCard(
-            number: '3',
-            wrong: 'I think — نُطقت /sɪŋk/',
-            correct: 'النطق الصحيح: /θɪŋk/',
-            explain: 'ضعي طرف اللسان بين الأسنان مع خروج الهواء.',
-          ),
-          const _SectionTitle('كلمات جديدة استخدمتِها'),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: const [
-              _WordChip('recommend — يوصي'),
-              _WordChip('medium-rare — نصف نضج'),
-              _WordChip('to go — للتغليف'),
-            ],
-          ),
-          const SizedBox(height: 22),
-          FilledButton.icon(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.bolt),
-            label: Text('العودة للمحادثة', style: ar(14, weight: FontWeight.w700)),
-            style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.all(16)),
-          ),
-        ],
-      ),
+      appBar: AppBar(backgroundColor: bg, elevation: 0, title: Text('مراجعة المحادثة', style: ar(16, weight: FontWeight.w700))),
+      body: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 30), children: [
+        const _FeedbackCelebration(),
+        Center(child: Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6), decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(20)), child: Text('✓ انتهت المحادثة', style: ar(12, weight: FontWeight.w700, color: primaryDark)))),
+        Center(child: Padding(padding: const EdgeInsets.only(top: 12), child: Text('أداء جيد اليوم', style: ar(18, weight: FontWeight.w700)))),
+        Center(child: Text('${minutes}د ${seconds}ث · $exchanges تبادلات · Ordering food at a restaurant', style: ar(12.5, color: inkFaint))),
+        if (reply.isNotEmpty) ...[const _SectionTitle('رد المساعد'), _Card(child: Text(reply, style: ar(13, color: inkSoft).copyWith(height: 1.7)))],
+        if (tips.isNotEmpty) ...[const _SectionTitle('نصيحة لك'), _Card(child: Text(tips.join('\n'), style: ar(13, color: inkSoft).copyWith(height: 1.7)))],
+        const _SectionTitle('أهم الأخطاء'),
+        ...shown.map((item) => _ReviewCard(number: '${shown.indexOf(item) + 1}', wrong: item['wrong'] ?? '', correct: item['correct'] ?? '', explain: item['explanation'] ?? '')),
+        const SizedBox(height: 22),
+        FilledButton.icon(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.bolt), label: Text('العودة للمحادثة', style: ar(14, weight: FontWeight.w700)), style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.all(16))),
+      ]),
     );
   }
 }
