@@ -135,11 +135,13 @@ def sign_up(request: SignUpRequest, db: Session = Depends(get_db)):
     user.email_verified = False
     user.auth_provider = "email"
     db.commit()
-    sent = _send_verification_email(email, code)
-    result = {"message": "تم إنشاء الحساب. تحققي من بريدك الإلكتروني.", "email": email, "sent": sent}
-    if settings.DEBUG and not sent:
-        result["dev_code"] = code
-    return result
+    try:
+        sent = _send_verification_email(email, code)
+    except (OSError, smtplib.SMTPException):
+        sent = False
+    if not sent:
+        return {"message": "تم إنشاء الحساب، لكن لم يتم إرسال رسالة البريد. يجب إعداد SMTP في Backend.", "email": email, "sent": False}
+    return {"message": "تم إنشاء الحساب. أرسلنا رمز التحقق إلى بريدك الإلكتروني.", "email": email, "sent": True}
 
 
 @router.post("/auth/verify-email")
