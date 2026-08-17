@@ -171,8 +171,8 @@ class HiwarApi {
     return HiwarProfile.fromJson(data);
   }
 
-  Future<HiwarProfile> signIn({required String userId, required String name, String? email, String provider = 'manual', String? subject}) async {
-    final response = await _dio.post('/api/v1/auth/sign-in', data: {'user_id': userId, 'name': name, 'email': email, 'auth_provider': provider, 'auth_subject': subject});
+  Future<HiwarProfile> signIn({required String userId, required String name, String? email, String provider = 'manual', String? subject, String? idToken}) async {
+    final response = await _dio.post('/api/v1/auth/sign-in', data: {'user_id': userId, 'name': name, 'email': email, 'auth_provider': provider, 'auth_subject': subject, 'id_token': idToken});
     final data = Map<String, dynamic>.from(response.data as Map);
     final token = data['access_token']?.toString();
     if (token != null && token.isNotEmpty) await saveAccessToken(token);
