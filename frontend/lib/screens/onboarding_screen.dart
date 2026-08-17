@@ -110,7 +110,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0, title: Text('خلّينا نتعرف عليك', style: ar(16, weight: FontWeight.w700))),
         body: Column(children: [
           Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Column(children: [
-            Row(children: List.generate(4, (i) => Expanded(child: AnimatedContainer(duration: const Duration(milliseconds: 180), height: 5, margin: EdgeInsets.only(left: i == 3 ? 0 : 6), decoration: BoxDecoration(color: i <= step ? _primary : _line, borderRadius: BorderRadius.circular(5))))),
+            Row(
+              children: List.generate(
+                4,
+                (i) => Expanded(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    height: 5,
+                    margin: EdgeInsets.only(left: i == 3 ? 0 : 6),
+                    decoration: BoxDecoration(
+                      color: i <= step ? _primary : _line,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 10),
             Align(alignment: Alignment.centerRight, child: Text('الخطوة ${step + 1} من 4', style: ar(11, color: _faint))),
           ])),
@@ -193,7 +208,36 @@ class _MinutesStep extends StatelessWidget {
       const SizedBox(height: 7),
       Text('نستخدمها عشان نبني لك خطة واقعية وما تضغط عليك.', style: ar(13, color: _faint)),
       const SizedBox(height: 22),
-      ...options.map((item) { final selected = value == item['value']; return Padding(padding: const EdgeInsets.only(bottom: 10), child: InkWell(onTap: () => onChanged(item['value'] as int), borderRadius: BorderRadius.circular(15), child: AnimatedContainer(duration: const Duration(milliseconds: 160), padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: selected ? _tint : Colors.white, border: Border.all(color: selected ? _primary : _line, width: selected ? 1.5 : 1), borderRadius: BorderRadius.circular(15)), child: Row(children: [Icon(item['icon'] as IconData, color: selected ? _primary : _faint), const SizedBox(width: 12), Expanded(child: Text(item['label'] as String, style: ar(13, weight: FontWeight.w600))), Icon(selected ? Icons.radio_button_checked : Icons.radio_button_off, color: selected ? _primary : _faint)]))))); }),
+      ...options.map((item) {
+        final selected = value == item['value'];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: InkWell(
+            onTap: () => onChanged(item['value'] as int),
+            borderRadius: BorderRadius.circular(15),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: selected ? _tint : Colors.white,
+                border: Border.all(
+                  color: selected ? _primary : _line,
+                  width: selected ? 1.5 : 1,
+                ),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Row(
+                children: [
+                  Icon(item['icon'] as IconData, color: selected ? _primary : _faint),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(item['label'] as String, style: ar(13, weight: FontWeight.w600))),
+                  Icon(selected ? Icons.radio_button_checked : Icons.radio_button_off, color: selected ? _primary : _faint),
+                ],
+              ),
+            ),
+          ),
+        );
+      }),
     ]);
   }
 }
