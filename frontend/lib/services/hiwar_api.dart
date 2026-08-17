@@ -71,6 +71,24 @@ class HiwarProfile {
   );
 }
 
+class HiwarError {
+  final int? id;
+  final String wrong;
+  final String correct;
+  final String explanation;
+  final String errorType;
+  final int count;
+  const HiwarError({this.id, required this.wrong, required this.correct, required this.explanation, required this.errorType, required this.count});
+  factory HiwarError.fromJson(Map<String, dynamic> json) => HiwarError(
+    id: (json['id'] as num?)?.toInt(),
+    wrong: '${json['wrong'] ?? json['wrong_text'] ?? ''}',
+    correct: '${json['correct'] ?? json['correct_text'] ?? ''}',
+    explanation: '${json['explanation'] ?? ''}',
+    errorType: '${json['error_type'] ?? 'general'}',
+    count: (json['count'] as num?)?.toInt() ?? 1,
+  );
+}
+
 class HiwarChatResult {
   final String reply;
   final List<Map<String, String>> corrections;
@@ -102,7 +120,16 @@ class HiwarApi {
           connectTimeout: const Duration(seconds: 8),
           receiveTimeout: const Duration(seconds: 8),
           headers: {'Content-Type': 'application/json'},
-        ));
+        )) {
+    _dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) async {
+      final path = options.path;
+      if (!path.contains('/auth/')) {
+        final token = await getAccessToken();
+        if (token != null && token.isNotEmpty) options.headers['Authorization'] = 'Bearer $token';
+      }
+      handler.next(options);
+    }));
+  }
 
   final Dio _dio;
 
@@ -113,6 +140,24 @@ class HiwarApi {
 
   String get baseUrl => _dio.options.baseUrl;
 
+  Future<HiwarProfile> passwordSignIn({required String email, required String password}) async {
+    final response = await _dio.post('/api/v1/auth/password-sign-in', data: {'email': email, 'password': password});
+    final data = Map<String, dynamic>.from(response.data as Map);
+    final token = data['access_token']?.toString();
+    if (token != null && token.isNotEmpty) await saveAccessToken(token);
+    return HiwarProfile.fromJson(data);
+  }
+
+  Future<void> saveAccessToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('hiwar_access_token', token);
+  }
+
+  Future<String?> getAccessToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('hiwar_access_token');
+  }
+
   Future<Map<String, dynamic>> signUp({required String name, required String email, required String password}) async {
     final response = await _dio.post('/api/v1/auth/sign-up', data: {'name': name, 'email': email, 'password': password});
     return Map<String, dynamic>.from(response.data as Map);
@@ -120,12 +165,38 @@ class HiwarApi {
 
   Future<HiwarProfile> verifyEmail({required String email, required String code}) async {
     final response = await _dio.post('/api/v1/auth/verify-email', data: {'email': email, 'code': code});
-    return HiwarProfile.fromJson(Map<String, dynamic>.from(response.data as Map));
+    final data = Map<String, dynamic>.from(response.data as Map);
+    final token = data['access_token']?.toString();
+    if (token != null && token.isNotEmpty) await saveAccessToken(token);
+    return HiwarProfile.fromJson(data);
   }
 
   Future<HiwarProfile> signIn({required String userId, required String name, String? email, String provider = 'manual', String? subject}) async {
     final response = await _dio.post('/api/v1/auth/sign-in', data: {'user_id': userId, 'name': name, 'email': email, 'auth_provider': provider, 'auth_subject': subject});
-    return HiwarProfile.fromJson(Map<String, dynamic>.from(response.data as Map));
+    final data = Map<String, dynamic>.from(response.data as Map);
+    final token = data['access_token']?.toString();
+    if (token != null && token.isNotEmpty) await saveAccessToken(token);
+    return HiwarProfile.fromJson(data);
+  }
+
+  Future<Map<String, dynamic>> assessReading({required String userId, required String passage, required String answer}) async {
+    final response = await _dio.post('/api/v1/assessment/reading', data: {'user_id': userId, 'passage': passage, 'answer': answer});
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> assessSpeaking({required String userId, required String prompt, required String transcript}) async {
+    final response = await _dio.post('/api/v1/assessment/speaking', data: {'user_id': userId, 'prompt': prompt, 'transcript': transcript});
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<void> saveLevelResult({required String userId, required String level, required int score}) async {
+    await _dio.post('/api/v1/assessment/level', data: {'user_id': userId, 'level': level, 'score': score});
+  }
+
+  Future<List<HiwarError>> getErrors(String userId) async {
+    final response = await _dio.get('/api/v1/errors/${Uri.encodeComponent(userId)}');
+    final data = Map<String, dynamic>.from(response.data as Map);
+    return ((data['errors'] as List?) ?? const []).map((item) => HiwarError.fromJson(Map<String, dynamic>.from(item as Map))).toList();
   }
 
   Future<HiwarChatResult> sendChat({required String userId, required String message}) async {
