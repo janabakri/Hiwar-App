@@ -434,7 +434,20 @@ class _ProfileContentState extends State<ProfileContent> {
     return ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 28), children: [
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('حسابي', style: ar(11, color: inkFaint)), Text(name, style: ar(21, weight: FontWeight.w700)), Text(_value(profile?.email), style: en(11, color: inkFaint))]),
-        Container(width: 58, height: 58, decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(20)), child: Center(child: Text(name.isEmpty ? 'ح' : name.substring(0, 1), style: ar(24, weight: FontWeight.w700, color: primary))),
+        Container(
+          width: 58,
+          height: 58,
+          decoration: BoxDecoration(
+            color: primaryTint,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Center(
+            child: Text(
+              name.isEmpty ? 'ح' : name.substring(0, 1),
+              style: ar(24, weight: FontWeight.w700, color: primary),
+            ),
+          ),
+        ),
       ]),
       const SizedBox(height: 16),
       _Card(child: Row(children: [
