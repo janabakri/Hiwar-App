@@ -66,7 +66,7 @@ class _BottomNav extends StatelessWidget {
     child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
       _NavItem(icon: Icons.home_outlined, label: 'الرئيسية', active: index == 0, onTap: () => onTap(0)),
       _NavItem(icon: Icons.search, label: 'استكشف', active: index == 1, onTap: () => onTap(1)),
-      _NavItem(icon: Icons.bar_chart_outlined, label: 'تقدّمي', active: index == 2, onTap: () => onTap(2)),
+      _NavItem(icon: Icons.bar_chart_outlined, label: 'تقدّم', active: index == 2, onTap: () => onTap(2)),
       _NavItem(icon: Icons.person_outline, label: 'حسابي', active: index == 3, onTap: () => onTap(3)),
     ]),
   );
@@ -160,7 +160,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
       },
     );
     if (!available) {
-      if (mounted) setState(() => status = 'اسمحي للتطبيق باستخدام الميكروفون');
+      if (mounted) setState(() => status = 'اسمح للتطبيق باستخدام الميكروفون');
       return;
     }
     setState(() {
@@ -189,7 +189,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
   Future<void> sendTranscript() async {
     final message = transcript.trim();
     if (message.isEmpty) {
-      if (mounted) setState(() => status = 'حاولي قول جملة قصيرة بالإنجليزي');
+      if (mounted) setState(() => status = 'حاول قول جملة قصيرة بالإنجليزي');
       return;
     }
     setState(() { sending = true; status = 'يفكر بالرد...'; });
@@ -356,7 +356,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
           _SectionTitle('الأخطاء والملاحظات السابقة (${historical.length})'),
           ...all.asMap().entries.map((entry) => _ReviewCard(number: '${entry.key + 1}', wrong: entry.value.wrong, correct: entry.value.correct, explain: '${entry.value.explanation}${entry.value.count > 1 ? ' · تكررت ${entry.value.count} مرات' : ''}')),
         ],
-        if (!loading && all.isEmpty) _Card(child: Text('استمري بالتحدث. سيظهر هنا سجل ملاحظاتك بعد أول تحليل حقيقي.', textAlign: TextAlign.center, style: ar(13, color: inkSoft).copyWith(height: 1.7))),
+        if (!loading && all.isEmpty) _Card(child: Text('استمر بالتحدث. سيظهر هنا سجل ملاحظاتك بعد أول تحليل حقيقي.', textAlign: TextAlign.center, style: ar(13, color: inkSoft).copyWith(height: 1.7))),
         const SizedBox(height: 22),
         FilledButton.icon(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.bolt), label: Text('العودة للمحادثة', style: ar(14, weight: FontWeight.w700)), style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.all(16))),
       ]),
@@ -372,7 +372,7 @@ class ExploreContent extends StatelessWidget {
   Widget build(BuildContext context) => ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 28), children: [
     const _SectionTitle('استكشف'),
     Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(gradient: const LinearGradient(colors: [primaryDark, primary]), borderRadius: BorderRadius.circular(18)), child: Row(children: [
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('✦ اقتراح ذكي لكِ', style: ar(11, weight: FontWeight.w700, color: Colors.white)), const SizedBox(height: 8), Text('بناءً على محادثاتك الأخيرة، ركّزي هالأسبوع على Present Perfect ونطق حرف th — قبل ما ننتقل لمهارة جديدة.', style: ar(13, color: Colors.white).copyWith(height: 1.6))])),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('✦ اقتراح ذكي لك', style: ar(11, weight: FontWeight.w700, color: Colors.white)), const SizedBox(height: 8), Text('بناءً على محادثاتك الأخيرة، ركّزي هالأسبوع على Present Perfect ونطق حرف th — قبل ما ننتقل لمهارة جديدة.', style: ar(13, color: Colors.white).copyWith(height: 1.6))])),
       const SizedBox(width: 8),
       const _SparkleArt(),
     ])),
@@ -387,7 +387,7 @@ class ProgressContent extends StatelessWidget {
   const ProgressContent({super.key, this.onLevelCheck});
   @override
   Widget build(BuildContext context) => ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 28), children: [
-    const _SectionTitle('تقدّمي'),
+    const _SectionTitle('تقدّم'),
     _Card(child: Row(children: [const _Ring(value: '480', label: 'XP'), const SizedBox(width: 16), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('B1 — متوسط', style: ar(14.5, weight: FontWeight.w700)), Text('12 يوم متتالي · 34 محادثة', style: ar(12, color: inkFaint))])])),
     const SizedBox(height: 14),
     _Card(onTap: onLevelCheck, child: Row(children: [const _LevelMeterArt(size: 58), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('حددي مستواك من جديد', style: ar(14, weight: FontWeight.w700)), Text('اختبار قصير يعطيك مسارًا أدق', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left, color: inkFaint)])),
