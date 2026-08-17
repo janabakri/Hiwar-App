@@ -64,15 +64,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   void goNext() {
     if (step == 0 && name.text.trim().isEmpty) {
-      setState(() => error = 'اكتبي اسمك أولًا.');
+      setState(() => error = 'اكتب اسمك أولًا.');
       return;
     }
     if (step == 1 && goals.isEmpty) {
-      setState(() => error = 'اختاري هدفًا واحدًا على الأقل.');
+      setState(() => error = 'اختار هدفًا واحدًا على الأقل.');
       return;
     }
     if (step == 3 && skills.isEmpty) {
-      setState(() => error = 'اختاري مهارة واحدة على الأقل.');
+      setState(() => error = 'اختار مهارة واحدة على الأقل.');
       return;
     }
     if (step == 3) {
@@ -97,7 +97,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
       if (mounted) widget.onComplete(updated);
     } catch (_) {
-      if (mounted) setState(() { busy = false; error = 'تعذر حفظ معلوماتك. تأكدي من تشغيل Backend.'; });
+      if (mounted) setState(() { busy = false; error = 'تعذر حفظ معلوماتك. تأكد من تشغيل Backend.'; });
     }
   }
 
@@ -131,9 +131,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ])),
           Expanded(child: PageView(controller: pages, physics: const NeverScrollableScrollPhysics(), onPageChanged: (value) => setState(() { step = value; error = null; }), children: [
             _BasicStep(name: name, age: age, education: education, onEducation: (value) => setState(() => education = value)),
-            _OptionsStep(title: 'ليش تبين تتعلمين إنجليزي؟', subtitle: 'اختاري كل الأشياء اللي تناسبك.', options: goalOptions, selected: goals, onToggle: (value) => setState(() { goals.contains(value) ? goals.remove(value) : goals.add(value); })),
+            _OptionsStep(title: 'ليش تبي تتعلم إنجليزي؟', subtitle: 'اختار كل الأشياء اللي تناسبك.', options: goalOptions, selected: goals, onToggle: (value) => setState(() { goals.contains(value) ? goals.remove(value) : goals.add(value); })),
             _MinutesStep(value: dailyMinutes, onChanged: (value) => setState(() => dailyMinutes = value)),
-            _OptionsStep(title: 'وش أكثر شيء تحتاجين تطورينه؟', subtitle: 'اختاري أكثر من مهارة، أو خلي الذكاء الاصطناعي يحدد لك.', options: skillOptions, selected: skills, onToggle: (value) => setState(() { skills.contains(value) ? skills.remove(value) : skills.add(value); })),
+            _OptionsStep(title: 'وش أكثر شيء تحتاج تطوره؟', subtitle: 'اختار أكثر من مهارة، أو خلي الذكاء الاصطناعي يحدد لك.', options: skillOptions, selected: skills, onToggle: (value) => setState(() { skills.contains(value) ? skills.remove(value) : skills.add(value); })),
           ])),
           Padding(padding: const EdgeInsets.fromLTRB(20, 8, 20, 24), child: Column(children: [
             if (error != null) Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(error!, textAlign: TextAlign.center, style: ar(12, color: const Color(0xFFB23B3B)))),
@@ -163,7 +163,7 @@ class _BasicStep extends StatelessWidget {
       const SizedBox(height: 12),
       _Field(controller: age, label: 'العمر', hint: 'اختياري', keyboard: TextInputType.number),
       const SizedBox(height: 18),
-      Text('كيف تصفين مستواك بشكل مبدئي؟', style: ar(13, weight: FontWeight.w700)),
+      Text('كيف تصف مستواك بشكل مبدئي؟', style: ar(13, weight: FontWeight.w700)),
       const SizedBox(height: 10),
       Wrap(spacing: 8, runSpacing: 8, children: ['مبتدئ', 'متوسط', 'متقدم'].map((item) => ChoiceChip(label: Text(item, style: ar(12)), selected: item == education, selectedColor: _tint, onSelected: (_) => onEducation(item))).toList()),
     ]);
@@ -204,7 +204,7 @@ class _MinutesStep extends StatelessWidget {
       {'label': 'أكثر من 30 دقيقة', 'value': 45, 'icon': Icons.rocket_launch_outlined},
     ];
     return ListView(padding: const EdgeInsets.fromLTRB(20, 16, 20, 20), children: [
-      Text('كم دقيقة تقدرين تتعلمين يوميًا؟', style: ar(20, weight: FontWeight.w800)),
+      Text('كم دقيقة تقدر تتعلم يوميًا؟', style: ar(20, weight: FontWeight.w800)),
       const SizedBox(height: 7),
       Text('نستخدمها عشان نبني لك خطة واقعية وما تضغط عليك.', style: ar(13, color: _faint)),
       const SizedBox(height: 22),
