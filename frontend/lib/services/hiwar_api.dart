@@ -47,11 +47,13 @@ class HiwarProfile {
   final String? educationLevel;
   final String? certificates;
   final String? learningReason;
+  final int? dailyMinutes;
+  final String? focusSkills;
   final bool profileComplete;
   final String level;
   final int levelScore;
 
-  const HiwarProfile({required this.userId, required this.name, this.email, this.age, this.educationLevel, this.certificates, this.learningReason, required this.profileComplete, required this.level, required this.levelScore});
+  const HiwarProfile({required this.userId, required this.name, this.email, this.age, this.educationLevel, this.certificates, this.learningReason, this.dailyMinutes, this.focusSkills, required this.profileComplete, required this.level, required this.levelScore});
 
   factory HiwarProfile.fromJson(Map<String, dynamic> json) => HiwarProfile(
     userId: '${json['user_id'] ?? ''}',
@@ -61,6 +63,8 @@ class HiwarProfile {
     educationLevel: json['education_level'] as String?,
     certificates: json['certificates'] as String?,
     learningReason: json['learning_reason'] as String?,
+    dailyMinutes: (json['daily_minutes'] as num?)?.toInt(),
+    focusSkills: json['focus_skills'] as String?,
     profileComplete: json['profile_complete'] == true,
     level: '${json['level'] ?? 'intermediate'}',
     levelScore: (json['level_score'] as num?)?.toInt() ?? 0,
@@ -134,8 +138,8 @@ class HiwarApi {
     return HiwarProfile.fromJson(Map<String, dynamic>.from(response.data as Map));
   }
 
-  Future<HiwarProfile> updateProfile({required String userId, required String name, int? age, String? educationLevel, String? certificates, String? learningReason}) async {
-    final response = await _dio.put('/api/v1/profile', data: {'user_id': userId, 'name': name, 'age': age, 'education_level': educationLevel, 'certificates': certificates, 'learning_reason': learningReason});
+  Future<HiwarProfile> updateProfile({required String userId, required String name, int? age, String? educationLevel, String? certificates, String? learningReason, int? dailyMinutes, String? focusSkills}) async {
+    final response = await _dio.put('/api/v1/profile', data: {'user_id': userId, 'name': name, 'age': age, 'education_level': educationLevel, 'certificates': certificates, 'learning_reason': learningReason, 'daily_minutes': dailyMinutes, 'focus_skills': focusSkills});
     return HiwarProfile.fromJson(Map<String, dynamic>.from(response.data as Map));
   }
 
