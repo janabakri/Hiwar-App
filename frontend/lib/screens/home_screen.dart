@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:video_player/video_player.dart';
 import '../services/hiwar_api.dart';
 
 const bg = Color(0xFFF6F3EF);
@@ -429,57 +430,57 @@ class _ProfileContentState extends State<ProfileContent> {
   Widget build(BuildContext context) {
     final profile = widget.profile;
     final score = profile?.levelScore ?? stats?.levelScore ?? 0;
-    final level = profile?.level ?? stats?.level ?? 'لم يحدد بعد';
+    final level = score > 0 ? (profile?.level ?? stats?.level ?? 'لم يحدد بعد') : 'لم يحدد بعد';
     final name = profile?.name ?? stats?.userName ?? 'معلوماتي في حوار';
-    return ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 28), children: [
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('حسابي', style: ar(11, color: inkFaint)), Text(name, style: ar(21, weight: FontWeight.w700)), Text(_value(profile?.email), style: en(11, color: inkFaint))]),
-        Container(
-          width: 58,
-          height: 58,
-          decoration: BoxDecoration(
-            color: primaryTint,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Center(
-            child: Text(
-              name.isEmpty ? 'ح' : name.substring(0, 1),
-              style: ar(24, weight: FontWeight.w700, color: primary),
-            ),
-          ),
-        ),
-      ]),
-      const SizedBox(height: 16),
-      _Card(child: Row(children: [
-        Container(width: 58, height: 58, decoration: const BoxDecoration(color: primary, shape: BoxShape.circle), child: const Icon(Icons.person_outline, color: Colors.white, size: 30)),
-        const SizedBox(width: 14),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('مستواك الحالي', style: ar(12, color: inkFaint)), Text(level, style: ar(17, weight: FontWeight.w700)), Text(score > 0 ? '$score / 100 نقطة من الاختبار' : 'لم يتم الاختبار بعد', style: mono(10.5, color: primary))])),
-        Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: score > 0 ? primaryTint : coralTint, borderRadius: BorderRadius.circular(18)), child: Text(score > 0 ? 'محدد بالـAI' : 'بانتظار الاختبار', style: ar(10, weight: FontWeight.w700, color: score > 0 ? primary : rust))),
+    final initial = name.trim().isEmpty ? 'ح' : name.trim().substring(0, 1);
+    return ListView(padding: const EdgeInsets.fromLTRB(18, 12, 18, 32), children: [
+      Align(alignment: Alignment.centerRight, child: Text('حسابي', style: ar(21, weight: FontWeight.w800))),
+      const SizedBox(height: 14),
+      _Card(child: Column(children: [
+        Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(name, style: ar(19, weight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text(_value(profile?.email), style: en(12, color: inkFaint)),
+            const SizedBox(height: 9),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5), decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(16)), child: Text(level, style: ar(11, weight: FontWeight.w700, color: primary))),
+          ])),
+          Container(width: 64, height: 64, decoration: const BoxDecoration(color: primary, shape: BoxShape.circle), child: Center(child: Text(initial, style: ar(24, weight: FontWeight.w800, color: Colors.white)))),
+          const SizedBox(width: 10),
+          IconButton(onPressed: () {}, icon: const Icon(Icons.edit_outlined, color: inkSoft, size: 20)),
+        ]),
       ])),
-      const _SectionTitle('إحصاءاتك'),
-      GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.45, children: [
-        _AccountStat(value: '${stats?.totalSessions ?? 0}', label: 'محادثة'),
-        _AccountStat(value: '${stats?.streakDays ?? 0}', label: 'يوم متتالي'),
-        _AccountStat(value: '${stats?.totalErrors ?? 0}', label: 'خطأ مسجل'),
-        _AccountStat(value: '${stats?.masteryRate ?? 0}%', label: 'نسبة الإتقان'),
-      ]),
+      const SizedBox(height: 14),
+      SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
+        _MetricTile(value: profile?.dailyMinutes == null ? '—' : '${profile!.dailyMinutes}', label: 'دقيقة يومية'),
+        _MetricTile(value: '${stats?.totalSessions ?? 0}', label: 'محادثة'),
+        _MetricTile(value: score > 0 ? '$score' : '—', label: 'نقطة المستوى'),
+        _MetricTile(value: '${stats?.streakDays ?? 0}', label: 'يوم متتالٍ'),
+      ])),
+      const _SectionTitle('الإنجازات'),
+      SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
+        _Badge(icon: Icons.local_fire_department_outlined, label: 'أيام متتالية', unlocked: (stats?.streakDays ?? 0) > 0),
+        const SizedBox(width: 9),
+        _Badge(icon: Icons.record_voice_over_outlined, label: 'أول محادثة', unlocked: (stats?.totalSessions ?? 0) > 0),
+        const SizedBox(width: 9),
+        _Badge(icon: Icons.emoji_events_outlined, label: 'مستوى محدد', unlocked: score > 0),
+      ])),
+      const _SectionTitle('التدريب'),
+      _Card(child: Column(children: [
+        _TrainingRow(icon: Icons.access_time_rounded, title: 'الهدف اليومي', value: profile?.dailyMinutes == null ? 'غير محدد' : '${profile!.dailyMinutes} دقيقة'),
+        const Divider(height: 1, color: line),
+        _TrainingRow(icon: Icons.mic_none_rounded, title: 'لهجة الذكاء الاصطناعي', value: 'American'),
+        const Divider(height: 1, color: line),
+        _TrainingRow(icon: Icons.notifications_none_rounded, title: 'تذكير المحادثة اليومية', value: 'مفعّل', trailing: Switch(value: true, onChanged: (_) {})),
+      ])),
       const _SectionTitle('معلوماتي الشخصية'),
       _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _InfoRow(label: 'العمر', value: profile?.age?.toString()),
         _InfoRow(label: 'المرحلة الدراسية', value: profile?.educationLevel),
-        _InfoRow(label: 'الوقت اليومي', value: profile?.dailyMinutes == null ? null : '${profile!.dailyMinutes} دقيقة'),
         _InfoRow(label: 'أهداف التعلم', value: profile?.learningReason),
         _InfoRow(label: 'المهارات المطلوبة', value: profile?.focusSkills),
         _InfoRow(label: 'الشهادات', value: profile?.certificates),
       ])),
-      const _SectionTitle('إنجازاتي'),
-      Row(children: [
-        Expanded(child: _Badge(icon: Icons.local_fire_department_outlined, label: 'أيام متتالية', unlocked: (stats?.streakDays ?? 0) > 0)),
-        const SizedBox(width: 8),
-        Expanded(child: _Badge(icon: Icons.record_voice_over_outlined, label: 'أول محادثة', unlocked: (stats?.totalSessions ?? 0) > 0)),
-        const SizedBox(width: 8),
-        Expanded(child: _Badge(icon: Icons.emoji_events_outlined, label: 'مستوى محدد', unlocked: score > 0)),
-      ]),
       if (loading) const Padding(padding: EdgeInsets.only(top: 16), child: Center(child: CircularProgressIndicator(color: primary))),
       if (!loading && error != null) Padding(padding: const EdgeInsets.only(top: 16), child: Text('تعذر تحميل الإحصاءات: $error', style: ar(11, color: rust))),
     ]);
@@ -494,6 +495,45 @@ class _InfoRow extends StatelessWidget {
 }
 
 class _AccountStat extends StatelessWidget {final String value,label;const _AccountStat({required this.value,required this.label});@override Widget build(BuildContext context)=>_Card(child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[Text(value,style:mono(17,weight:FontWeight.w600,color:primary)),Text(label,style:ar(11,color:inkFaint))]));}
+
+class _MetricTile extends StatelessWidget {
+  final String value;
+  final String label;
+  const _MetricTile({required this.value, required this.label});
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 112,
+    height: 84,
+    margin: const EdgeInsets.only(left: 8),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+    decoration: BoxDecoration(color: paper, borderRadius: BorderRadius.circular(18), border: Border.all(color: line)),
+    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Text(value, style: mono(17, weight: FontWeight.w700, color: ink)),
+      const SizedBox(height: 4),
+      Text(label, textAlign: TextAlign.center, style: ar(10, color: inkFaint)),
+    ]),
+  );
+}
+
+class _TrainingRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+  final Widget? trailing;
+  const _TrainingRow({required this.icon, required this.title, required this.value, this.trailing});
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 62,
+    child: Row(children: [
+      Icon(icon, color: inkSoft, size: 21),
+      const SizedBox(width: 12),
+      Expanded(child: Text(title, style: ar(13, weight: FontWeight.w600))),
+      if (trailing != null) trailing! else Text(value, style: en(12, color: inkSoft)),
+      const SizedBox(width: 8),
+      const Icon(Icons.chevron_left_rounded, color: inkFaint, size: 20),
+    ]),
+  );
+}
 
 
 class _FeedbackCelebration extends StatelessWidget {
@@ -618,6 +658,9 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
   String spokenText = '';
   bool analyzing = false;
   Map<String, dynamic> speakingAnalysis = const {};
+  late final VideoPlayerController videoController;
+  bool videoReady = false;
+  bool videoFailed = false;
 
   Future<void> submitReading(String answer) async {
     score += answer.startsWith('Small') ? 1 : 0;
@@ -629,23 +672,38 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
     if (mounted) setState(() => section++);
   }
 
-  final grammar = const [
+  final grammar = <Map<String, Object>>[
     {'q': 'She ___ to work every day.', 'a': ['go', 'goes', 'going'], 'correct': 1},
     {'q': 'I have lived here ___ 2020.', 'a': ['for', 'since', 'during'], 'correct': 1},
     {'q': 'They ___ dinner when I called.', 'a': ['had', 'were having', 'have'], 'correct': 1},
     {'q': 'If I had time, I ___ more.', 'a': ['study', 'studied', 'would study'], 'correct': 2},
     {'q': 'This is the book ___ I told you about.', 'a': ['who', 'where', 'that'], 'correct': 2},
+    {'q': 'He ___ already finished the report.', 'a': ['has', 'have', 'having'], 'correct': 0},
+    {'q': 'We ___ to the museum last weekend.', 'a': ['go', 'went', 'gone'], 'correct': 1},
+    {'q': 'There ___ many ways to practice English.', 'a': ['is', 'are', 'be'], 'correct': 1},
   ];
-  final vocabulary = const [
+  final vocabulary = <Map<String, Object>>[
     {'q': 'What does “accurate” mean?', 'a': ['correct', 'fast', 'difficult'], 'correct': 0},
     {'q': 'The opposite of “borrow” is…', 'a': ['lend', 'keep', 'buy'], 'correct': 0},
     {'q': 'A “deadline” is…', 'a': ['a final time', 'a conversation', 'a holiday'], 'correct': 0},
     {'q': '“Improve” means to…', 'a': ['get better', 'get smaller', 'stop'], 'correct': 0},
     {'q': 'A person who travels is a…', 'a': ['traveler', 'listener', 'writer'], 'correct': 0},
+    {'q': 'If you are “reliable”, people can…', 'a': ['trust you', 'avoid you', 'forget you'], 'correct': 0},
+    {'q': '“Brief” means…', 'a': ['short', 'expensive', 'noisy'], 'correct': 0},
+    {'q': 'A “habit” is something you…', 'a': ['do regularly', 'buy once', 'never remember'], 'correct': 0},
   ];
 
   @override
-  void dispose() { speech.stop(); tts.stop(); super.dispose(); }
+  void initState() {
+    super.initState();
+    grammar.shuffle();
+    vocabulary.shuffle();
+    videoController = VideoPlayerController.networkUrl(Uri.parse('https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4'))
+      ..initialize().then((_) { if (mounted) setState(() => videoReady = true); }).catchError((_) { if (mounted) setState(() => videoFailed = true); });
+  }
+
+  @override
+  void dispose() { speech.stop(); tts.stop(); videoController.dispose(); super.dispose(); }
 
   List<Map<String, Object>> get currentQuestions => section == 0 ? grammar : vocabulary;
 
@@ -683,13 +741,14 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
   }
 
   Future<void> playListeningClip() async {
-    const clip = 'She has been working here for two years. She enjoys learning English every day.';
-    if (playingListening) { await tts.stop(); if (mounted) setState(() => playingListening = false); return; }
-    await tts.setLanguage('en-US');
-    await tts.setSpeechRate(.42);
+    if (!videoReady) return;
+    if (videoController.value.isPlaying) {
+      await videoController.pause();
+      if (mounted) setState(() => playingListening = false);
+      return;
+    }
+    await videoController.play();
     if (mounted) setState(() => playingListening = true);
-    await tts.speak(clip);
-    if (mounted) setState(() => playingListening = false);
   }
 
   String levelFromScore(int value) {
@@ -792,11 +851,33 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
         Text('اسمعي المقطع ثم اختاري المعنى الأقرب.', style: ar(14, weight: FontWeight.w700)),
         const SizedBox(height: 12),
         _Card(child: Column(children: [
-          Text('She has been working here for two years. She enjoys learning English every day.', textAlign: TextAlign.center, style: en(15, color: inkSoft).copyWith(height: 1.6)),
+          Text('شاهدي المقطع ثم اختاري الجملة التي تصف ما رأيتِه وسمعتِه.', textAlign: TextAlign.center, style: ar(13, color: inkSoft).copyWith(height: 1.6)),
           const SizedBox(height: 12),
-          FilledButton.icon(onPressed: playListeningClip, icon: Icon(playingListening ? Icons.stop_rounded : Icons.volume_up_rounded), label: Text(playingListening ? 'إيقاف المقطع' : 'تشغيل المقطع', style: ar(12, weight: FontWeight.w700)), style: FilledButton.styleFrom(backgroundColor: primaryTint, foregroundColor: primary)),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: videoReady
+                ? AspectRatio(
+                    aspectRatio: videoController.value.aspectRatio == 0 ? 16 / 9 : videoController.value.aspectRatio,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        VideoPlayer(videoController),
+                        DecoratedBox(
+                          decoration: BoxDecoration(color: Colors.black.withOpacity(.24), shape: BoxShape.circle),
+                          child: IconButton(
+                            onPressed: playListeningClip,
+                            icon: Icon(playingListening ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white, size: 34),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : Container(height: 190, color: primaryTint, child: Center(child: videoFailed ? Text('تعذر تحميل الفيديو. تحققي من اتصال الإنترنت.', textAlign: TextAlign.center, style: ar(12, color: rust)) : const CircularProgressIndicator(color: primary))),
+          ),
           const SizedBox(height: 10),
-          ...['هي تعمل هنا منذ سنتين وتحب تعلم الإنجليزية يوميًا', 'هي ستعمل هنا غدًا فقط', 'هي لا تتعلم الإنجليزية'].map((item) => ListTile(contentPadding: EdgeInsets.zero, title: Text(item, style: ar(13)), onTap: () { score += item.startsWith('هي تعمل هنا') ? 1 : 0; setState(() => section++); })),
+          FilledButton.icon(onPressed: videoReady ? playListeningClip : null, icon: Icon(playingListening ? Icons.pause_rounded : Icons.play_arrow_rounded), label: Text(playingListening ? 'إيقاف الفيديو' : 'تشغيل الفيديو', style: ar(12, weight: FontWeight.w700)), style: FilledButton.styleFrom(backgroundColor: primaryTint, foregroundColor: primary)),
+          const SizedBox(height: 10),
+          ...['A butterfly is flying over the flowers.', 'The person is driving a car.', 'The room is completely empty.'].map((item) => ListTile(contentPadding: EdgeInsets.zero, title: Text(item, style: en(13)), onTap: () { score += item.startsWith('A butterfly') ? 1 : 0; setState(() => section++); })),
         ])),
       ] else if (isSpeaking) ...[
         Text('تحدثي لمدة 30–60 ثانية عن نفسك.', style: ar(14, weight: FontWeight.w700)), const SizedBox(height: 12), _Card(child: Column(children: [Text('Tell me about yourself.', textAlign: TextAlign.center, style: en(22, weight: FontWeight.w700, color: primary)), const SizedBox(height: 16), IconButton(onPressed: startSpeaking, icon: Icon(listening ? Icons.stop_circle : Icons.mic_rounded, color: listening ? rust : primary, size: 58)), if (spokenText.isNotEmpty) Text(spokenText, textAlign: TextAlign.center, style: en(13, color: inkSoft).copyWith(height: 1.6)), const SizedBox(height: 8), Text('Grammar · Vocabulary · Fluency · Pronunciation · Naturalness', textAlign: TextAlign.center, style: ar(11, color: inkFaint))])),
