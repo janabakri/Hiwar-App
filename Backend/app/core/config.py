@@ -59,6 +59,7 @@ class Settings:
 
     # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")
+    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
 
     # Email verification
     SMTP_HOST: str = os.getenv("SMTP_HOST", "")
