@@ -49,6 +49,8 @@ class ProfileUpdateRequest(BaseModel):
     education_level: Optional[str] = Field(default=None, max_length=80)
     certificates: Optional[str] = Field(default=None, max_length=1000)
     learning_reason: Optional[str] = Field(default=None, max_length=1200)
+    daily_minutes: Optional[int] = Field(default=None, ge=5, le=240)
+    focus_skills: Optional[str] = Field(default=None, max_length=500)
 
 
 def _hash_password(password: str) -> str:
@@ -82,6 +84,8 @@ def _serialize(user: User):
         "education_level": user.education_level,
         "certificates": user.certificates,
         "learning_reason": user.learning_reason,
+        "daily_minutes": user.daily_minutes,
+        "focus_skills": user.focus_skills,
         "level": user.level,
         "level_score": user.level_score,
         "total_sessions": user.total_sessions,
@@ -164,6 +168,8 @@ def update_profile(request: ProfileUpdateRequest, db: Session = Depends(get_db))
     user.education_level = request.education_level
     user.certificates = request.certificates
     user.learning_reason = request.learning_reason
+    user.daily_minutes = request.daily_minutes
+    user.focus_skills = request.focus_skills
     user.profile_complete = True
     user.last_active = datetime.utcnow()
     db.commit()
