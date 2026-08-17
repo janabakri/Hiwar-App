@@ -41,7 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final pages = [
       HomeContent(profile: widget.profile, onVoice: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => VoiceScreen(api: _api)))),
       ExploreContent(),
-      ProgressContent(onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LevelCheckScreen()))),
+      ProgressContent(onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: widget.profile?.userId)))),
       ProfileContent(api: _api, profile: widget.profile),
     ];
     return Directionality(
@@ -98,7 +98,7 @@ class HomeContent extends StatelessWidget {
   Widget build(BuildContext context) => ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 28), children: [
     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('مساء الخير، ${profile?.name ?? 'في حوار'}', style: ar(19, weight: FontWeight.w700)), Text('جاهزة لمحادثة اليوم؟', style: ar(12.5, color: inkFaint))]), Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), decoration: BoxDecoration(color: coralTint, borderRadius: BorderRadius.circular(20)), child: Row(children: [const Icon(Icons.local_fire_department, color: Color(0xFFB5451A), size: 15), const SizedBox(width: 5), Text('12 يوم', style: ar(12.5, weight: FontWeight.w600, color: const Color(0xFFB5451A)))]))]),
     const SizedBox(height: 18),
-    _Card(child: Row(children: [const _Ring(value: '62%'), const SizedBox(width: 16), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('B1 — متوسط', style: ar(14.5, weight: FontWeight.w700)), Text('أقرب مستوى: B2 · Upper Intermediate', style: ar(12, color: inkFaint)), const SizedBox(height: 5), Text('XP 480 / 780', style: mono(11.5, weight: FontWeight.w600, color: primary))])])),
+    _Card(child: Row(children: [ _Ring(value: '${profile?.levelScore ?? 0}%'), const SizedBox(width: 16), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${profile?.level ?? 'لم يحدد بعد'}', style: ar(14.5, weight: FontWeight.w700)), Text((profile?.levelScore ?? 0) > 0 ? 'نتيجتك من اختبار تحديد المستوى' : 'أكملي اختبار تحديد المستوى أولًا', style: ar(12, color: inkFaint)), const SizedBox(height: 5), Text((profile?.levelScore ?? 0) > 0 ? '${profile?.levelScore ?? 0} نقطة مستوى' : 'لا توجد نتيجة بعد', style: mono(11.5, weight: FontWeight.w600, color: primary))])])),
     const SizedBox(height: 26),
     Column(children: [GestureDetector(onTap: onVoice, child: Container(width: 132, height: 132, decoration: const BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(center: Alignment(-.35, -.5), colors: [Color(0xFF6459A8), primary])), child: const Icon(Icons.mic_none, size: 44, color: Colors.white))), const SizedBox(height: 16), Text('ابدأ محادثة صوتية', style: ar(15.5, weight: FontWeight.w700)), const SizedBox(height: 3), Text('تحدّث بحرية، الذكاء الاصطناعي يستمع ويرد عليك', style: ar(12, color: inkFaint))]),
     _SectionTitle('مقترح اليوم', tag: 'مبني على أدائك'),
@@ -398,8 +398,88 @@ class ProgressContent extends StatelessWidget {
   ]);
 }
 
-class ProfileContent extends StatefulWidget { final HiwarApi api; final HiwarProfile? profile; const ProfileContent({super.key,required this.api, this.profile}); @override State<ProfileContent> createState()=>_ProfileContentState(); }
-class _ProfileContentState extends State<ProfileContent> { HiwarStats? stats; String? error; bool loading=true; final controller=TextEditingController(); @override void initState(){super.initState();_load();} Future<void> _load() async {setState(()=>loading=true); final id=await widget.api.getUserId(); controller.text=id; try{final result=await widget.api.getStats(id); if(mounted)setState((){stats=result;error=null;loading=false;});}catch(e){if(mounted)setState((){error=e.toString().replaceFirst('Exception: ','');loading=false;});}} Future<void> _connect() async {await widget.api.saveUserId(controller.text);_load();} @override Widget build(BuildContext context)=>ListView(padding:const EdgeInsets.fromLTRB(20,12,20,28),children:[Row(children:[Container(width:58,height:58,decoration:BoxDecoration(color:primaryTint,borderRadius:BorderRadius.circular(20)),child:const Icon(Icons.person_outline,color:primary,size:28)),const SizedBox(width:12),Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('حسابي',style:ar(11,color:inkFaint)),Text(stats?.userName??'معلوماتي في Hiwar',style:ar(19,weight:FontWeight.w700)),Text(controller.text,style:mono(10,color:inkFaint))])]),const SizedBox(height:14),if(widget.profile != null) _Card(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('معلوماتي',style:ar(13,weight:FontWeight.w700,color:inkSoft)),const SizedBox(height:10),Text('العمر: ${widget.profile!.age ?? 'غير محدد'}',style:ar(12.5)),Text('المرحلة: ${widget.profile!.educationLevel ?? 'غير محددة'}',style:ar(12.5)),Text('الشهادات: ${widget.profile!.certificates?.isNotEmpty == true ? widget.profile!.certificates : 'لا توجد'}',style:ar(12.5)),Text('الهدف: ${widget.profile!.learningReason?.isNotEmpty == true ? widget.profile!.learningReason : 'لم تتم إضافته'}',style:ar(12.5))])),const SizedBox(height:14),const _ProfileExtras(),const SizedBox(height:14),_Card(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('معرّف المستخدم',style:ar(12,weight:FontWeight.w700,color:inkSoft)),const SizedBox(height:8),Row(children:[Expanded(child:TextField(controller:controller,textDirection:TextDirection.ltr,style:mono(11),decoration:InputDecoration(hintText:'أدخلي user_id من Hiwar',hintStyle:ar(11,color:inkFaint),isDense:true,border:OutlineInputBorder(borderRadius:BorderRadius.circular(11),borderSide:const BorderSide(color:line))))),const SizedBox(width:8),FilledButton(onPressed:_connect,style:FilledButton.styleFrom(backgroundColor:primary),child:Text('تحديث',style:ar(12,weight:FontWeight.w700,color:Colors.white)))])])),if(loading)const Padding(padding:EdgeInsets.only(top:14),child:_Card(child:Text('جارٍ تحميل معلوماتك...'))),if(!loading&&error!=null)Padding(padding:const EdgeInsets.only(top:14),child:_Card(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('تعذر جلب المعلومات',style:ar(13,weight:FontWeight.w700,color:rust)),const SizedBox(height:6),Text(error!,style:ar(11,color:inkSoft)),const SizedBox(height:10),FilledButton(onPressed:_load,style:FilledButton.styleFrom(backgroundColor:primary),child:Text('إعادة المحاولة',style:ar(12,color:Colors.white))),const SizedBox(height:5),Text('API: ${widget.api.baseUrl}',style:mono(9,color:inkFaint))]))),if(!loading&&error==null&&stats!=null) ...[_Card(child:Row(children:[_Ring(value:'${stats!.levelScore}%',label:'المستوى'),const SizedBox(width:16),Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(stats!.level,style:ar(14.5,weight:FontWeight.w700)),Text('تقدمك الحالي في التعلم',style:ar(12,color:inkFaint)),Text('${stats!.levelScore} نقطة مستوى',style:mono(11,color:primary))])])),const SizedBox(height:12),GridView.count(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),crossAxisCount:2,mainAxisSpacing:10,crossAxisSpacing:10,childAspectRatio:1.5,children:[_AccountStat(value:'${stats!.totalSessions}',label:'محادثة'),_AccountStat(value:'${stats!.streakDays}',label:'يوم متتالي'),_AccountStat(value:'${stats!.totalErrors}',label:'خطأ مسجل'),_AccountStat(value:'${stats!.masteryRate}%',label:'نسبة الإتقان')])]]); }
+class ProfileContent extends StatefulWidget {
+  final HiwarApi api;
+  final HiwarProfile? profile;
+  const ProfileContent({super.key, required this.api, this.profile});
+  @override State<ProfileContent> createState() => _ProfileContentState();
+}
+
+class _ProfileContentState extends State<ProfileContent> {
+  HiwarStats? stats;
+  String? error;
+  bool loading = true;
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    try {
+      final id = widget.profile?.userId ?? await widget.api.getUserId();
+      final result = await widget.api.getStats(id);
+      if (mounted) setState(() { stats = result; error = null; loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { error = e.toString().replaceFirst('Exception: ', ''); loading = false; });
+    }
+  }
+
+  String _value(String? value) => value == null || value.trim().isEmpty ? 'غير محدد' : value;
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = widget.profile;
+    final score = profile?.levelScore ?? stats?.levelScore ?? 0;
+    final level = profile?.level ?? stats?.level ?? 'لم يحدد بعد';
+    final name = profile?.name ?? stats?.userName ?? 'معلوماتي في حوار';
+    return ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 28), children: [
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('حسابي', style: ar(11, color: inkFaint)), Text(name, style: ar(21, weight: FontWeight.w700)), Text(_value(profile?.email), style: en(11, color: inkFaint))]),
+        Container(width: 58, height: 58, decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(20)), child: Center(child: Text(name.isEmpty ? 'ح' : name.substring(0, 1), style: ar(24, weight: FontWeight.w700, color: primary))),
+      ]),
+      const SizedBox(height: 16),
+      _Card(child: Row(children: [
+        Container(width: 58, height: 58, decoration: const BoxDecoration(color: primary, shape: BoxShape.circle), child: const Icon(Icons.person_outline, color: Colors.white, size: 30)),
+        const SizedBox(width: 14),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('مستواك الحالي', style: ar(12, color: inkFaint)), Text(level, style: ar(17, weight: FontWeight.w700)), Text(score > 0 ? '$score / 100 نقطة من الاختبار' : 'لم يتم الاختبار بعد', style: mono(10.5, color: primary))])),
+        Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: score > 0 ? primaryTint : coralTint, borderRadius: BorderRadius.circular(18)), child: Text(score > 0 ? 'محدد بالـAI' : 'بانتظار الاختبار', style: ar(10, weight: FontWeight.w700, color: score > 0 ? primary : rust))),
+      ])),
+      const _SectionTitle('إحصاءاتك'),
+      GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.45, children: [
+        _AccountStat(value: '${stats?.totalSessions ?? 0}', label: 'محادثة'),
+        _AccountStat(value: '${stats?.streakDays ?? 0}', label: 'يوم متتالي'),
+        _AccountStat(value: '${stats?.totalErrors ?? 0}', label: 'خطأ مسجل'),
+        _AccountStat(value: '${stats?.masteryRate ?? 0}%', label: 'نسبة الإتقان'),
+      ]),
+      const _SectionTitle('معلوماتي الشخصية'),
+      _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _InfoRow(label: 'العمر', value: profile?.age?.toString()),
+        _InfoRow(label: 'المرحلة الدراسية', value: profile?.educationLevel),
+        _InfoRow(label: 'الوقت اليومي', value: profile?.dailyMinutes == null ? null : '${profile!.dailyMinutes} دقيقة'),
+        _InfoRow(label: 'أهداف التعلم', value: profile?.learningReason),
+        _InfoRow(label: 'المهارات المطلوبة', value: profile?.focusSkills),
+        _InfoRow(label: 'الشهادات', value: profile?.certificates),
+      ])),
+      const _SectionTitle('إنجازاتي'),
+      Row(children: [
+        Expanded(child: _Badge(icon: Icons.local_fire_department_outlined, label: 'أيام متتالية', unlocked: (stats?.streakDays ?? 0) > 0)),
+        const SizedBox(width: 8),
+        Expanded(child: _Badge(icon: Icons.record_voice_over_outlined, label: 'أول محادثة', unlocked: (stats?.totalSessions ?? 0) > 0)),
+        const SizedBox(width: 8),
+        Expanded(child: _Badge(icon: Icons.emoji_events_outlined, label: 'مستوى محدد', unlocked: score > 0)),
+      ]),
+      if (loading) const Padding(padding: EdgeInsets.only(top: 16), child: Center(child: CircularProgressIndicator(color: primary))),
+      if (!loading && error != null) Padding(padding: const EdgeInsets.only(top: 16), child: Text('تعذر تحميل الإحصاءات: $error', style: ar(11, color: rust))),
+    ]);
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String? value;
+  const _InfoRow({required this.label, this.value});
+  @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(bottom: 10), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [SizedBox(width: 112, child: Text(label, style: ar(12, color: inkFaint))), Expanded(child: Text(value == null || value!.trim().isEmpty ? 'غير محدد' : value!, style: ar(12.5, weight: FontWeight.w600, color: inkSoft)))]));
+}
+
 class _AccountStat extends StatelessWidget {final String value,label;const _AccountStat({required this.value,required this.label});@override Widget build(BuildContext context)=>_Card(child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[Text(value,style:mono(17,weight:FontWeight.w600,color:primary)),Text(label,style:ar(11,color:inkFaint))]));}
 
 
@@ -498,6 +578,13 @@ class _Badge extends StatelessWidget {
   Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 5), decoration: BoxDecoration(color: unlocked ? const Color(0xFFF7EEDB) : paper, border: Border.all(color: unlocked ? const Color(0xFFEAD9C4) : line), borderRadius: BorderRadius.circular(12)), child: Column(children: [Icon(icon, size: 22, color: unlocked ? const Color(0xFFB5842B) : inkFaint), const SizedBox(height: 5), Text(label, textAlign: TextAlign.center, style: ar(9.5, weight: FontWeight.w600, color: inkSoft))]));
 }
 
+class _AnalysisRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _AnalysisRow({required this.label, required this.value});
+  @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(bottom: 7), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(label, style: ar(12, color: inkSoft)), Text(value, style: mono(12, weight: FontWeight.w700, color: primary))]));
+}
+
 class LevelCheckScreen extends StatefulWidget {
   final HiwarApi? api;
   final String? userId;
@@ -513,6 +600,8 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
   int score = 0;
   bool listening = false;
   final stt.SpeechToText speech = stt.SpeechToText();
+  final FlutterTts tts = FlutterTts();
+  bool playingListening = false;
   String spokenText = '';
   bool analyzing = false;
   Map<String, dynamic> speakingAnalysis = const {};
@@ -543,7 +632,7 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
   ];
 
   @override
-  void dispose() { speech.stop(); super.dispose(); }
+  void dispose() { speech.stop(); tts.stop(); super.dispose(); }
 
   List<Map<String, Object>> get currentQuestions => section == 0 ? grammar : vocabulary;
 
@@ -554,35 +643,71 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
   }
 
   Future<void> startSpeaking() async {
-    if (listening) { await speech.stop(); setState(() => listening = false); return; }
-    final ready = await speech.initialize();
-    if (!ready) return;
-    setState(() { listening = true; spokenText = ''; });
-    await speech.listen(localeId: 'en_US', listenMode: stt.ListenMode.dictation, onResult: (result) {
-      if (!mounted) return;
-      setState(() => spokenText = result.recognizedWords);
-      if (result.finalResult) setState(() => listening = false);
-    });
+    if (listening) {
+      await speech.stop();
+      if (mounted) setState(() => listening = false);
+      return;
+    }
+    final ready = await speech.initialize(
+      onStatus: (status) { if (mounted && status == 'done') setState(() => listening = false); },
+      onError: (_) { if (mounted) setState(() => listening = false); },
+    );
+    if (!ready) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اسمحي للمتصفح باستخدام الميكروفون ثم حاولي مرة أخرى.')));
+      return;
+    }
+    if (mounted) setState(() { listening = true; spokenText = ''; });
+    await speech.listen(
+      localeId: 'en_US',
+      listenMode: stt.ListenMode.dictation,
+      partialResults: true,
+      onResult: (result) {
+        if (!mounted) return;
+        setState(() => spokenText = result.recognizedWords);
+        if (result.finalResult) setState(() => listening = false);
+      },
+    );
+  }
+
+  Future<void> playListeningClip() async {
+    const clip = 'She has been working here for two years. She enjoys learning English every day.';
+    if (playingListening) { await tts.stop(); if (mounted) setState(() => playingListening = false); return; }
+    await tts.setLanguage('en-US');
+    await tts.setSpeechRate(.42);
+    if (mounted) setState(() => playingListening = true);
+    await tts.speak(clip);
+    if (mounted) setState(() => playingListening = false);
   }
 
   Future<void> finish() async {
-    if (widget.api != null && widget.userId != null) {
-      setState(() => analyzing = true);
-      try {
-        speakingAnalysis = await widget.api!.assessSpeaking(userId: widget.userId!, prompt: 'Tell me about yourself.', transcript: spokenText);
-      } catch (_) {}
+    if (widget.api == null || widget.userId == null) return;
+    setState(() => analyzing = true);
+    try {
+      speakingAnalysis = await widget.api!.assessSpeaking(userId: widget.userId!, prompt: 'Tell me about yourself.', transcript: spokenText);
+    } catch (_) {
+      speakingAnalysis = {'estimated_level': 'pending', 'overall_score': score * 10, 'feedback': 'تعذر الاتصال بتحليل AI. يمكنك إعادة المحاولة بعد تشغيل Backend.'};
     }
     final remoteLevel = '${speakingAnalysis['estimated_level'] ?? ''}';
     final estimated = remoteLevel.isNotEmpty && remoteLevel != 'pending' ? remoteLevel : score >= 9 ? 'B2' : score >= 6 ? 'B1' : score >= 3 ? 'A2' : 'A1';
     final finalScore = (speakingAnalysis['overall_score'] as num?)?.toInt() ?? (score * 10).clamp(0, 100);
-    if (widget.api != null && widget.userId != null) {
-      try { await widget.api!.saveLevelResult(userId: widget.userId!, level: estimated, score: finalScore); } catch (_) {}
-    }
+    try { await widget.api!.saveLevelResult(userId: widget.userId!, level: estimated, score: finalScore); } catch (_) {}
     if (mounted) setState(() => analyzing = false);
-    showDialog(context: context, barrierDismissible: false, builder: (_) => AlertDialog(
-      title: Text('مستواك التقديري $estimated', style: ar(18, weight: FontWeight.w800)),
-          content: Text('${speakingAnalysis['feedback'] ?? 'نتيجتك مبنية على إجاباتك وتحليل التحدث. النطق يحتاج تسجيل صوتي مخصص لتحليله بدقة.'}', style: ar(13, color: inkSoft).copyWith(height: 1.7)),
-      actions: [TextButton(onPressed: () { Navigator.pop(context); widget.onComplete?.call(); if (widget.onComplete == null) Navigator.pop(context); }, child: Text('ابدئي التعلم', style: ar(13, color: primary, weight: FontWeight.w700)))],
+    if (!mounted) return;
+    showDialog(context: context, barrierDismissible: false, builder: (dialogContext) => AlertDialog(
+      title: Text('نتيجتك: $estimated', style: ar(18, weight: FontWeight.w800)),
+      content: SizedBox(width: 330, child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('${speakingAnalysis['feedback'] ?? 'تحليل AI جاهز.'}', style: ar(13, color: inkSoft).copyWith(height: 1.7)),
+        const SizedBox(height: 14),
+        _AnalysisRow(label: 'النتيجة العامة', value: '$finalScore / 100'),
+        _AnalysisRow(label: 'القواعد', value: '${speakingAnalysis['grammar_score'] ?? '—'}'),
+        _AnalysisRow(label: 'المفردات', value: '${speakingAnalysis['vocabulary_score'] ?? '—'}'),
+        _AnalysisRow(label: 'الطلاقة', value: '${speakingAnalysis['fluency_score'] ?? '—'}'),
+        _AnalysisRow(label: 'تركيب الجمل', value: '${speakingAnalysis['sentence_structure_score'] ?? '—'}'),
+        _AnalysisRow(label: 'الطبيعية', value: '${speakingAnalysis['naturalness_score'] ?? '—'}'),
+        const SizedBox(height: 8),
+        Text('ملاحظة: تقييم النطق يحتاج تسجيلًا صوتيًا مخصصًا، أما هذا التحليل فمبني على النص المنطوق.', style: ar(11, color: inkFaint).copyWith(height: 1.6)),
+      ]))),
+      actions: [TextButton(onPressed: () { Navigator.pop(dialogContext); widget.onComplete?.call(); }, child: Text('ابدئي التعلم', style: ar(13, color: primary, weight: FontWeight.w700)))],
     ));
   }
 
@@ -637,10 +762,18 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
       ] else if (isReading) ...[
         Text('اقرئي القطعة ثم أجيبي عن السؤال.', style: ar(14, weight: FontWeight.w700)), const SizedBox(height: 12), _Card(child: Text('Learning a language takes practice. Small daily conversations can help you become more confident and understand people from different cultures.', style: en(15, color: inkSoft).copyWith(height: 1.7))), const SizedBox(height: 14), _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('What helps you become more confident?', style: en(15, weight: FontWeight.w700)), const SizedBox(height: 12), ...['Small daily conversations', 'Watching no videos', 'Avoiding practice'].map((item) => ListTile(contentPadding: EdgeInsets.zero, title: Text(item, style: en(13)), onTap: () => submitReading(item)))])),
       ] else if (isListening) ...[
-        Text('اسمعي الجملة ثم اختاري معناها.', style: ar(14, weight: FontWeight.w700)), const SizedBox(height: 12), _Card(child: Column(children: [IconButton(onPressed: () {}, icon: const Icon(Icons.volume_up_rounded, color: primary, size: 36)), Text('She has been working here for two years.', textAlign: TextAlign.center, style: en(15, color: inkSoft)), const SizedBox(height: 12), ...['هي تعمل هنا منذ سنتين', 'هي ستعمل غدًا', 'هي لم تعمل من قبل'].map((item) => ListTile(contentPadding: EdgeInsets.zero, title: Text(item, style: ar(13)), onTap: () { score += item.startsWith('هي تعمل') ? 1 : 0; setState(() => section++); }))])),
+        Text('اسمعي المقطع ثم اختاري المعنى الأقرب.', style: ar(14, weight: FontWeight.w700)),
+        const SizedBox(height: 12),
+        _Card(child: Column(children: [
+          Text('She has been working here for two years. She enjoys learning English every day.', textAlign: TextAlign.center, style: en(15, color: inkSoft).copyWith(height: 1.6)),
+          const SizedBox(height: 12),
+          FilledButton.icon(onPressed: playListeningClip, icon: Icon(playingListening ? Icons.stop_rounded : Icons.volume_up_rounded), label: Text(playingListening ? 'إيقاف المقطع' : 'تشغيل المقطع', style: ar(12, weight: FontWeight.w700)), style: FilledButton.styleFrom(backgroundColor: primaryTint, foregroundColor: primary)),
+          const SizedBox(height: 10),
+          ...['هي تعمل هنا منذ سنتين وتحب تعلم الإنجليزية يوميًا', 'هي ستعمل هنا غدًا فقط', 'هي لا تتعلم الإنجليزية'].map((item) => ListTile(contentPadding: EdgeInsets.zero, title: Text(item, style: ar(13)), onTap: () { score += item.startsWith('هي تعمل هنا') ? 1 : 0; setState(() => section++); })),
+        ])),
       ] else if (isSpeaking) ...[
         Text('تحدثي لمدة 30–60 ثانية عن نفسك.', style: ar(14, weight: FontWeight.w700)), const SizedBox(height: 12), _Card(child: Column(children: [Text('Tell me about yourself.', textAlign: TextAlign.center, style: en(22, weight: FontWeight.w700, color: primary)), const SizedBox(height: 16), IconButton(onPressed: startSpeaking, icon: Icon(listening ? Icons.stop_circle : Icons.mic_rounded, color: listening ? rust : primary, size: 58)), if (spokenText.isNotEmpty) Text(spokenText, textAlign: TextAlign.center, style: en(13, color: inkSoft).copyWith(height: 1.6)), const SizedBox(height: 8), Text('Grammar · Vocabulary · Fluency · Pronunciation · Naturalness', textAlign: TextAlign.center, style: ar(11, color: inkFaint))])),
-        const SizedBox(height: 18), FilledButton(onPressed: analyzing || spokenText.trim().isEmpty ? null : finish, style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.all(16)), child: Text(analyzing ? 'جارٍ تحليل إجابتك...' : 'عرض مستواي', style: ar(14, weight: FontWeight.w700, color: Colors.white))),
+        const SizedBox(height: 18), FilledButton(onPressed: analyzing || spokenText.trim().isEmpty ? null : finish, style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.all(16)), child: Text(analyzing ? 'جارٍ تحليل إجابتك...' : 'حلّل مستواي بالـAI', style: ar(14, weight: FontWeight.w700, color: Colors.white))),
       ] else ...[],
     ]));
   }
