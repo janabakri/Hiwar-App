@@ -17,6 +17,7 @@ dependencies:
   shimmer: ^3.0.0
   speech_to_text: ^6.6.0
   flutter_tts: ^3.8.0
+  video_player: ^2.9.2
 
 dev_dependencies:
   flutter_test:
