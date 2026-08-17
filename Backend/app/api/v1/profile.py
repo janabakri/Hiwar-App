@@ -21,6 +21,13 @@ from ...core.database import get_db
 from ...models.user import User
 from ...core.config import settings
 
+try:
+    from google.oauth2 import id_token as google_id_token
+    from google.auth.transport import requests as google_requests
+except ImportError:
+    google_id_token = None
+    google_requests = None
+
 router = APIRouter()
 
 
@@ -30,6 +37,7 @@ class SignInRequest(BaseModel):
     email: Optional[str] = Field(default=None, max_length=150)
     auth_provider: str = Field(default="manual", max_length=30)
     auth_subject: Optional[str] = Field(default=None, max_length=255)
+    id_token: Optional[str] = Field(default=None, max_length=5000)
 
 
 class SignUpRequest(BaseModel):
@@ -73,6 +81,20 @@ def _verify_password(password: str, encoded: str) -> bool:
         return hmac.compare_digest(actual, expected)
     except (ValueError, TypeError):
         return False
+
+
+def _verify_google_token(raw_token: Optional[str]) -> dict:
+    if not raw_token or google_id_token is None or google_requests is None or not settings.GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=401, detail="Google OAuth is not configured")
+    try:
+        claims = google_id_token.verify_oauth2_token(raw_token, google_requests.Request(), settings.GOOGLE_CLIENT_ID)
+        if claims.get('email_verified') is not True:
+            raise HTTPException(status_code=403, detail="Google email is not verified")
+        return claims
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail="Invalid Google token") from exc
 
 
 def _issue_token(user: User) -> str:
@@ -180,14 +202,20 @@ def password_sign_in(request: PasswordSignInRequest, db: Session = Depends(get_d
 
 @router.post("/auth/sign-in")
 def sign_in(request: SignInRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.user_id == request.user_id).first()
+    claims = _verify_google_token(request.id_token) if request.auth_provider == 'google' else {}
+    verified_email = claims.get('email') if claims else request.email
+    verified_subject = claims.get('sub') if claims else request.auth_subject
+    verified_name = claims.get('name') or request.name
+    stable_user_id = f"google-{verified_subject}" if verified_subject else request.user_id
+    user = db.query(User).filter(User.user_id == stable_user_id).first()
     if not user:
-        user = User(user_id=request.user_id, name=request.name)
+        user = User(user_id=stable_user_id, name=verified_name)
         db.add(user)
-    user.name = request.name
-    user.email = request.email
+    user.name = verified_name
+    user.email = verified_email
     user.auth_provider = request.auth_provider
-    user.auth_subject = request.auth_subject
+    user.auth_subject = verified_subject
+    user.email_verified = True
     user.last_active = datetime.utcnow()
     db.commit()
     db.refresh(user)

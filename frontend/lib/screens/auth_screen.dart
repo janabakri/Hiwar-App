@@ -56,7 +56,12 @@ class _AuthScreenState extends State<AuthScreen> {
       final account = await google.signIn();
       if (account == null) return;
       setState(() { busy = true; error = null; });
-      final profile = await widget.api.signIn(userId: account.id, name: account.displayName ?? account.email.split('@').first, email: account.email, provider: 'google', subject: account.id);
+      final authentication = await account.authentication;
+      final idToken = authentication.idToken;
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('Google ID token is missing. Configure OAuth client IDs first.');
+      }
+      final profile = await widget.api.signIn(userId: account.id, name: account.displayName ?? account.email.split('@').first, email: account.email, provider: 'google', subject: account.id, idToken: idToken);
       await widget.api.saveUserId(profile.userId);
       if (mounted) widget.onSignedIn(profile);
     } catch (_) {
