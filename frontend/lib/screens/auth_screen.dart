@@ -23,7 +23,6 @@ class _AuthScreenState extends State<AuthScreen> {
   bool signupMode = false;
   bool waitingForCode = false;
   String? error;
-  String? devCode;
 
   @override
   void dispose() {
@@ -88,7 +87,8 @@ class _AuthScreenState extends State<AuthScreen> {
     setState(() { busy = true; error = null; });
     try {
       final result = await widget.api.signUp(name: name.text.trim(), email: email.text.trim(), password: password.text);
-      if (mounted) setState(() { busy = false; waitingForCode = true; devCode = result['dev_code']?.toString(); });
+      final sent = result['sent'] == true;
+      if (mounted) setState(() { busy = false; waitingForCode = sent; error = sent ? null : 'لم يتم إرسال البريد. يجب إعداد SMTP في Backend أولًا.'; });
     } catch (_) {
       if (mounted) setState(() { busy = false; error = 'تعذر إنشاء الحساب. تحققي من البريد أو تشغيل Backend.'; });
     }
@@ -154,7 +154,6 @@ class _AuthScreenState extends State<AuthScreen> {
                 Container(padding: const EdgeInsets.all(13), decoration: BoxDecoration(color: const Color(0xFFF0EDF8), borderRadius: BorderRadius.circular(14)), child: Text('أرسلنا رمزًا إلى ${email.text.trim()}', textAlign: TextAlign.center, style: arabic(12.5, color: primary))),
                 const SizedBox(height: 14),
                 TextField(controller: code, keyboardType: TextInputType.number, textAlign: TextAlign.center, decoration: fieldDecoration('رمز التحقق', hint: '000000')),
-                if (devCode != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text('رمز التطوير: $devCode', textAlign: TextAlign.center, style: arabic(11, color: const Color(0xFFB23B3B)))),
                 const SizedBox(height: 15),
                 FilledButton(onPressed: busy ? null : _verifySignup, style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.all(16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), child: Text('تأكيد البريد والدخول', style: arabic(14, weight: FontWeight.w700, color: Colors.white))),
               ],
