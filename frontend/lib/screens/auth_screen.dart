@@ -66,19 +66,17 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _manualSignIn() async {
-    if (name.text.trim().isEmpty) {
-      setState(() => error = 'اكتبي اسمك أولًا.');
+    if (email.text.trim().isEmpty || password.text.length < 8) {
+      setState(() => error = 'أدخلي البريد وكلمة المرور الصحيحة.');
       return;
     }
     setState(() { busy = true; error = null; });
     try {
-      final address = email.text.trim().isEmpty ? null : email.text.trim();
-      final userId = 'manual-${(address ?? name.text.trim()).toLowerCase().replaceAll(' ', '-')}';
-      final profile = await widget.api.signIn(userId: userId, name: name.text.trim(), email: address);
+      final profile = await widget.api.passwordSignIn(email: email.text.trim(), password: password.text);
       await widget.api.saveUserId(profile.userId);
       if (mounted) widget.onSignedIn(profile);
     } catch (_) {
-      if (mounted) setState(() { busy = false; error = 'تعذر تسجيل الدخول. تأكدي من تشغيل Backend.'; });
+      if (mounted) setState(() { busy = false; error = 'البريد أو كلمة المرور غير صحيحة، أو لم يتم تفعيل البريد.'; });
     }
   }
 
@@ -135,9 +133,9 @@ class _AuthScreenState extends State<AuthScreen> {
               const SizedBox(height: 16),
               Row(children: [const Expanded(child: Divider(color: Color(0xFFE8E2DB))), Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: Text('أو', style: arabic(11, color: const Color(0xFF948DA6)))), const Expanded(child: Divider(color: Color(0xFFE8E2DB)))]),
               const SizedBox(height: 16),
-              TextField(controller: name, decoration: fieldDecoration('الاسم', icon: Icons.person_outline)),
+              TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: fieldDecoration('البريد الإلكتروني', icon: Icons.mail_outline)),
               const SizedBox(height: 11),
-              TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: fieldDecoration('البريد الإلكتروني (اختياري)', icon: Icons.mail_outline)),
+              TextField(controller: password, obscureText: true, decoration: fieldDecoration('كلمة المرور', hint: '8 أحرف على الأقل', icon: Icons.lock_outline)),
               const SizedBox(height: 14),
               FilledButton(onPressed: busy ? null : _manualSignIn, style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.all(16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), child: Text('دخول', style: arabic(14, weight: FontWeight.w700, color: Colors.white))),
               const SizedBox(height: 8),
