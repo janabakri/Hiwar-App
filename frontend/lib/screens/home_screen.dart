@@ -679,6 +679,14 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
     if (mounted) setState(() => playingListening = false);
   }
 
+  String levelFromScore(int value) {
+    if (value < 25) return 'A1 — مبتدئ';
+    if (value < 45) return 'A2 — ابتدائي';
+    if (value < 65) return 'B1 — متوسط';
+    if (value < 82) return 'B2 — فوق المتوسط';
+    return 'C1 — متقدم';
+  }
+
   Future<void> finish() async {
     if (widget.api == null || widget.userId == null) return;
     setState(() => analyzing = true);
@@ -687,9 +695,13 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
     } catch (_) {
       speakingAnalysis = {'estimated_level': 'pending', 'overall_score': score * 10, 'feedback': 'تعذر الاتصال بتحليل AI. يمكنك إعادة المحاولة بعد تشغيل Backend.'};
     }
-    final remoteLevel = '${speakingAnalysis['estimated_level'] ?? ''}';
-    final estimated = remoteLevel.isNotEmpty && remoteLevel != 'pending' ? remoteLevel : score >= 9 ? 'B2' : score >= 6 ? 'B1' : score >= 3 ? 'A2' : 'A1';
-    final finalScore = (speakingAnalysis['overall_score'] as num?)?.toInt() ?? (score * 10).clamp(0, 100);
+    final remoteLevel = '${speakingAnalysis['estimated_level'] ?? ''}'.trim().toUpperCase();
+    final speakingScore = (speakingAnalysis['overall_score'] as num?)?.toInt();
+    final knowledgeScore = ((score / 12) * 100).round().clamp(0, 100).toInt();
+    final finalScore = speakingScore == null || speakingScore <= 0 ? knowledgeScore : ((knowledgeScore * .5) + (speakingScore * .5)).round().clamp(0, 100).toInt();
+    final computedLevel = levelFromScore(finalScore);
+    final aiLevelIsValid = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].any((level) => remoteLevel.startsWith(level));
+    final estimated = aiLevelIsValid ? remoteLevel : computedLevel;
     try { await widget.api!.saveLevelResult(userId: widget.userId!, level: estimated, score: finalScore); } catch (_) {}
     if (mounted) setState(() => analyzing = false);
     if (!mounted) return;
@@ -699,6 +711,8 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
         Text('${speakingAnalysis['feedback'] ?? 'تحليل AI جاهز.'}', style: ar(13, color: inkSoft).copyWith(height: 1.7)),
         const SizedBox(height: 14),
         _AnalysisRow(label: 'النتيجة العامة', value: '$finalScore / 100'),
+        _AnalysisRow(label: 'نتيجة المعرفة', value: '$knowledgeScore / 100'),
+        _AnalysisRow(label: 'المستوى المحسوب', value: computedLevel),
         _AnalysisRow(label: 'القواعد', value: '${speakingAnalysis['grammar_score'] ?? '—'}'),
         _AnalysisRow(label: 'المفردات', value: '${speakingAnalysis['vocabulary_score'] ?? '—'}'),
         _AnalysisRow(label: 'الطلاقة', value: '${speakingAnalysis['fluency_score'] ?? '—'}'),
