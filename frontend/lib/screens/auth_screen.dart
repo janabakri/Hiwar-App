@@ -65,13 +65,13 @@ class _AuthScreenState extends State<AuthScreen> {
       await widget.api.saveUserId(profile.userId);
       if (mounted) widget.onSignedIn(profile);
     } catch (_) {
-      if (mounted) setState(() { busy = false; error = 'لم يكتمل تسجيل Google. تحققي من إعداد OAuth أو استخدمي Sign up.'; });
+      if (mounted) setState(() { busy = false; error = 'لم يكتمل تسجيل Google. تحقق من إعداد OAuth أو استخدم Sign up.'; });
     }
   }
 
   Future<void> _manualSignIn() async {
     if (email.text.trim().isEmpty || password.text.length < 8) {
-      setState(() => error = 'أدخلي البريد وكلمة المرور الصحيحة.');
+      setState(() => error = 'أدخل البريد وكلمة المرور الصحيحة.');
       return;
     }
     setState(() { busy = true; error = null; });
@@ -86,7 +86,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _requestSignupCode() async {
     if (name.text.trim().isEmpty || email.text.trim().isEmpty || password.text.length < 8) {
-      setState(() => error = 'أدخلي الاسم والبريد وكلمة مرور من 8 أحرف على الأقل.');
+      setState(() => error = 'أدخل الاسم والبريد وكلمة مرور من 8 أحرف على الأقل.');
       return;
     }
     setState(() { busy = true; error = null; });
@@ -95,13 +95,13 @@ class _AuthScreenState extends State<AuthScreen> {
       final sent = result['sent'] == true;
       if (mounted) setState(() { busy = false; waitingForCode = sent; error = sent ? null : 'لم يتم إرسال البريد. يجب إعداد SMTP في Backend أولًا.'; });
     } catch (_) {
-      if (mounted) setState(() { busy = false; error = 'تعذر إنشاء الحساب. تحققي من البريد أو تشغيل Backend.'; });
+      if (mounted) setState(() { busy = false; error = 'تعذر إنشاء الحساب. تحقق من البريد أو تشغيل Backend.'; });
     }
   }
 
   Future<void> _verifySignup() async {
     if (code.text.trim().length != 6) {
-      setState(() => error = 'أدخلي رمز التحقق المكوّن من 6 أرقام.');
+      setState(() => error = 'أدخل رمز التحقق المكوّن من 6 أرقام.');
       return;
     }
     setState(() { busy = true; error = null; });
@@ -128,9 +128,9 @@ class _AuthScreenState extends State<AuthScreen> {
         body: SafeArea(child: ListView(padding: const EdgeInsets.fromLTRB(22, 24, 22, 28), children: [
           Center(child: Container(width: 56, height: 56, decoration: BoxDecoration(color: primary, borderRadius: BorderRadius.circular(17), boxShadow: [BoxShadow(color: primary.withOpacity(.22), blurRadius: 18, offset: const Offset(0, 8))]), child: const Icon(Icons.mic_none_rounded, color: Colors.white, size: 27))),
           const SizedBox(height: 18),
-          Center(child: Text(waitingForCode ? 'باقي خطوة واحدة' : (signupMode ? 'أنشئي حسابك في حوار' : 'أهلًا فيك 👋'), textAlign: TextAlign.center, style: arabic(19, weight: FontWeight.w800))),
+          Center(child: Text(waitingForCode ? 'باقي خطوة واحدة' : (signupMode ? 'أنشئ حسابك في حوار' : 'أهلًا فيك 👋'), textAlign: TextAlign.center, style: arabic(19, weight: FontWeight.w800))),
           const SizedBox(height: 6),
-          Center(child: Text(waitingForCode ? 'تحققي من بريدك الإلكتروني لنكمل معًا.' : (signupMode ? 'احفظي تقدمك وخلي تجربتك مصممة لك.' : 'سجّلي دخولك عشان تكملي رحلتك بالإنجليزي'), textAlign: TextAlign.center, style: arabic(12.5, color: const Color(0xFF948DA6)).copyWith(height: 1.6))),
+          Center(child: Text(waitingForCode ? 'تحقق من بريدك الإلكتروني لنكمل معًا.' : (signupMode ? 'احفظ تقدمك وخل تجربتك مصمم لك.' : 'سجّل دخولك عشان تكمل رحلتك بالإنجليزي'), textAlign: TextAlign.center, style: arabic(12.5, color: const Color(0xFF948DA6)).copyWith(height: 1.6))),
           const SizedBox(height: 24),
           Container(padding: const EdgeInsets.all(19), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: const Color(0xFF32265C).withOpacity(.06), blurRadius: 24, offset: const Offset(0, 10))]), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             if (!signupMode && !waitingForCode) ...[
@@ -168,7 +168,7 @@ class _AuthScreenState extends State<AuthScreen> {
             if (error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(error!, textAlign: TextAlign.center, style: arabic(12, color: const Color(0xFFB23B3B)))),
           ])),
           const SizedBox(height: 16),
-          Text('بالاستمرار، أنتِ توافقين على تجربة تعلم آمنة ومحترمة.', textAlign: TextAlign.center, style: arabic(10.5, color: const Color(0xFF948DA6))),
+          Text('بالاستمرار، أنت توافق على تجربة تعلم آمنة ومحترمة.', textAlign: TextAlign.center, style: arabic(10.5, color: const Color(0xFF948DA6))),
         ])),
       ),
     );
