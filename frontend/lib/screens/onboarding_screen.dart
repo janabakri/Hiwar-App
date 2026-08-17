@@ -137,7 +137,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ])),
           Padding(padding: const EdgeInsets.fromLTRB(20, 8, 20, 24), child: Column(children: [
             if (error != null) Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(error!, textAlign: TextAlign.center, style: ar(12, color: const Color(0xFFB23B3B)))),
-            SizedBox(width: double.infinity, child: FilledButton(onPressed: busy ? null : goNext, style: FilledButton.styleFrom(backgroundColor: _primary, padding: const EdgeInsets.all(16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), child: Text(busy ? 'جارٍ الحفظ...' : step == 3 ? 'حفظ وابدئي تحديد مستواك' : 'التالي', style: ar(14, weight: FontWeight.w700, color: Colors.white)))),
+            SizedBox(width: double.infinity, child: FilledButton(onPressed: busy ? null : goNext, style: FilledButton.styleFrom(backgroundColor: _primary, padding: const EdgeInsets.all(16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), child: Text(busy ? 'جارٍ الحفظ...' : step == 3 ? 'احفظ وابدأ تحديد مستواك' : 'التالي', style: ar(14, weight: FontWeight.w700, color: Colors.white)))),
           ])),
         ]),
       ),

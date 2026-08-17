@@ -115,7 +115,13 @@ async def chat(
                 reply = ai_reply
                 
         except Exception as exc:
-            reply = f"AI request failed. Details: {exc}"
+            # Do not expose provider keys, quota details, or stack traces to app users.
+            print(f"AI chat provider error: {exc}")
+            message = str(exc).lower()
+            if '429' in message or 'quota' in message or 'insufficient_quota' in message:
+                reply = 'خدمة التحليل الذكي مشغولة حاليًا. تم حفظ رسالتك، حاول مرة أخرى بعد قليل.'
+            else:
+                reply = 'تعذر الحصول على رد الذكاء الاصطناعي الآن، لكن يمكنك متابعة التدريب والمحاولة مرة أخرى.'
     
     # 5. Prepare corrections
     corrections = [
