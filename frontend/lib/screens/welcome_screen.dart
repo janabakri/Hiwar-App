@@ -61,7 +61,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 Expanded(child: PageView.builder(controller: controller, itemCount: slides.length, onPageChanged: (value) => setState(() => index = value), itemBuilder: (_, i) => slides[i])),
                 Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(slides.length, (i) => AnimatedContainer(duration: const Duration(milliseconds: 180), margin: const EdgeInsets.symmetric(horizontal: 3), width: i == index ? 18 : 6, height: 6, decoration: BoxDecoration(color: i == index ? _primary : const Color(0xFFE6E1DA), borderRadius: BorderRadius.circular(5))))),
                 const SizedBox(height: 20),
-                SizedBox(width: double.infinity, child: FilledButton(onPressed: next, style: FilledButton.styleFrom(backgroundColor: _primary, padding: const EdgeInsets.all(16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: Text(index == slides.length - 1 ? 'ابدئي رحلتك' : 'التالي', style: _ar(14.5, color: Colors.white, weight: FontWeight.w700)))),
+                SizedBox(width: double.infinity, child: FilledButton(onPressed: next, style: FilledButton.styleFrom(backgroundColor: _primary, padding: const EdgeInsets.all(16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: Text(index == slides.length - 1 ? 'ابدئ رحلتك' : 'التالي', style: _ar(14.5, color: Colors.white, weight: FontWeight.w700)))),
               ],
             ),
           ),
