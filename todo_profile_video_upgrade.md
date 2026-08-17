@@ -4,4 +4,4 @@
 - [x] إضافة مشغل فيديو مرئي إلى مرحلة Listening بدل TTS فقط.
 - [x] توسيع بنك Grammar وVocabulary وخلط الأسئلة في كل اختبار.
 - [x] تشغيل فحص diff؛ ويجب تشغيل `flutter pub get` و`flutter analyze` على جهاز Windows.
-- [ ] حفظ التعديلات ورفعها إلى GitHub.
+- [x] حفظ التعديلات ورفعها إلى GitHub.

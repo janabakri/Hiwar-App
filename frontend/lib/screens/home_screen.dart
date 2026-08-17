@@ -97,9 +97,9 @@ class HomeContent extends StatelessWidget {
   const HomeContent({super.key, this.profile, required this.onVoice});
   @override
   Widget build(BuildContext context) => ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 28), children: [
-    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('مساء الخير، ${profile?.name ?? 'في حوار'}', style: ar(19, weight: FontWeight.w700)), Text('جاهزة لمحادثة اليوم؟', style: ar(12.5, color: inkFaint))]), Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), decoration: BoxDecoration(color: coralTint, borderRadius: BorderRadius.circular(20)), child: Row(children: [const Icon(Icons.local_fire_department, color: Color(0xFFB5451A), size: 15), const SizedBox(width: 5), Text('12 يوم', style: ar(12.5, weight: FontWeight.w600, color: const Color(0xFFB5451A)))]))]),
+    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('مساء الخير، ${profile?.name ?? 'في حوار'}', style: ar(19, weight: FontWeight.w700)), Text('جاهز لمحادثة اليوم؟', style: ar(12.5, color: inkFaint))]), Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), decoration: BoxDecoration(color: coralTint, borderRadius: BorderRadius.circular(20)), child: Row(children: [const Icon(Icons.local_fire_department, color: Color(0xFFB5451A), size: 15), const SizedBox(width: 5), Text('12 يوم', style: ar(12.5, weight: FontWeight.w600, color: const Color(0xFFB5451A)))]))]),
     const SizedBox(height: 18),
-    _Card(child: Row(children: [ _Ring(value: '${profile?.levelScore ?? 0}%'), const SizedBox(width: 16), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${profile?.level ?? 'لم يحدد بعد'}', style: ar(14.5, weight: FontWeight.w700)), Text((profile?.levelScore ?? 0) > 0 ? 'نتيجتك من اختبار تحديد المستوى' : 'أكملي اختبار تحديد المستوى أولًا', style: ar(12, color: inkFaint)), const SizedBox(height: 5), Text((profile?.levelScore ?? 0) > 0 ? '${profile?.levelScore ?? 0} نقطة مستوى' : 'لا توجد نتيجة بعد', style: mono(11.5, weight: FontWeight.w600, color: primary))])])),
+    _Card(child: Row(children: [ _Ring(value: '${profile?.levelScore ?? 0}%'), const SizedBox(width: 16), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${profile?.level ?? 'لم يحدد بعد'}', style: ar(14.5, weight: FontWeight.w700)), Text((profile?.levelScore ?? 0) > 0 ? 'نتيجتك من اختبار تحديد المستوى' : 'أكمل اختبار تحديد المستوى أولًا', style: ar(12, color: inkFaint)), const SizedBox(height: 5), Text((profile?.levelScore ?? 0) > 0 ? '${profile?.levelScore ?? 0} نقطة مستوى' : 'لا توجد نتيجة بعد', style: mono(11.5, weight: FontWeight.w600, color: primary))])])),
     const SizedBox(height: 26),
     Column(children: [GestureDetector(onTap: onVoice, child: Container(width: 132, height: 132, decoration: const BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(center: Alignment(-.35, -.5), colors: [Color(0xFF6459A8), primary])), child: const Icon(Icons.mic_none, size: 44, color: Colors.white))), const SizedBox(height: 16), Text('ابدأ محادثة صوتية', style: ar(15.5, weight: FontWeight.w700)), const SizedBox(height: 3), Text('تحدّث بحرية، الذكاء الاصطناعي يستمع ويرد عليك', style: ar(12, color: inkFaint))]),
     _SectionTitle('مقترح اليوم', tag: 'مبني على أدائك'),
@@ -129,6 +129,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
   bool sending = false;
   String status = 'اضغط للبدء بالحديث';
   String transcript = '';
+  bool showTranscript = false;
   final List<Map<String, String>> corrections = [];
   String reply = '';
   List<String> tips = const [];
@@ -167,7 +168,8 @@ class _VoiceScreenState extends State<VoiceScreen> {
     setState(() {
       active = true;
       listening = true;
-      status = 'أنصت إليك...';
+      showTranscript = false;
+      status = 'أستمع إليك...';
       transcript = '';
     });
     timer ??= Timer.periodic(const Duration(seconds: 1), (_) {
@@ -287,7 +289,10 @@ class _VoiceScreenState extends State<VoiceScreen> {
               ),
             ),
             const SizedBox(height: 22),
-            if (transcript.isNotEmpty) Padding(padding: const EdgeInsets.symmetric(horizontal: 26), child: Text(transcript, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: ar(12, color: inkSoft))),
+            if (transcript.isNotEmpty) ...[
+              TextButton.icon(onPressed: () => setState(() => showTranscript = !showTranscript), icon: Icon(showTranscript ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 17), label: Text(showTranscript ? 'إخفاء كلامك' : 'إظهار كلامك', style: ar(11.5, color: primary))),
+              if (showTranscript) Padding(padding: const EdgeInsets.symmetric(horizontal: 26), child: Text(transcript, textAlign: TextAlign.center, maxLines: 3, overflow: TextOverflow.ellipsis, style: ar(12, color: inkSoft))),
+            ],
             const SizedBox(height: 8),
             Text(elapsed, style: mono(13, color: inkFaint)),
           ]),
@@ -391,7 +396,7 @@ class ProgressContent extends StatelessWidget {
     const _SectionTitle('تقدّم'),
     _Card(child: Row(children: [const _Ring(value: '480', label: 'XP'), const SizedBox(width: 16), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('B1 — متوسط', style: ar(14.5, weight: FontWeight.w700)), Text('12 يوم متتالي · 34 محادثة', style: ar(12, color: inkFaint))])])),
     const SizedBox(height: 14),
-    _Card(onTap: onLevelCheck, child: Row(children: [const _LevelMeterArt(size: 58), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('حددي مستواك من جديد', style: ar(14, weight: FontWeight.w700)), Text('اختبار قصير يعطيك مسارًا أدق', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left, color: inkFaint)])),
+    _Card(onTap: onLevelCheck, child: Row(children: [const _LevelMeterArt(size: 58), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('حدد مستواك من جديد', style: ar(14, weight: FontWeight.w700)), Text('اختبار قصير يعطيك مسارًا أدق', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left, color: inkFaint)])),
     const _SectionTitle('سجل الأخطاء المتكررة'),
     const _Card(child: ListTile(contentPadding: EdgeInsets.zero, leading: CircleAvatar(radius: 12, backgroundColor: rustTint, child: Text('×7', style: TextStyle(color: rust, fontSize: 11))), title: Text('Present Perfect vs Past Simple'), subtitle: Text('أكثر خطأ تكرر معك هذا الشهر'))),
     const SizedBox(height: 12),
@@ -656,6 +661,7 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
   final FlutterTts tts = FlutterTts();
   bool playingListening = false;
   String spokenText = '';
+  bool showSpokenText = false;
   bool analyzing = false;
   Map<String, dynamic> speakingAnalysis = const {};
   late final VideoPlayerController videoController;
@@ -724,10 +730,10 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
       onError: (_) { if (mounted) setState(() => listening = false); },
     );
     if (!ready) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اسمحي للمتصفح باستخدام الميكروفون ثم حاولي مرة أخرى.')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اسمح للمتصفح باستخدام الميكروفون ثم حاول مرة أخرى.')));
       return;
     }
-    if (mounted) setState(() { listening = true; spokenText = ''; });
+    if (mounted) setState(() { listening = true; showSpokenText = false; spokenText = ''; });
     await speech.listen(
       localeId: 'en_US',
       listenMode: stt.ListenMode.dictation,
@@ -793,7 +799,7 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
         const SizedBox(height: 8),
         Text('ملاحظة: تقييم النطق يحتاج تسجيلًا صوتيًا مخصصًا، أما هذا التحليل فمبني على النص المنطوق.', style: ar(11, color: inkFaint).copyWith(height: 1.6)),
       ]))),
-      actions: [TextButton(onPressed: () { Navigator.pop(dialogContext); widget.onComplete?.call(); }, child: Text('ابدئي التعلم', style: ar(13, color: primary, weight: FontWeight.w700)))],
+      actions: [TextButton(onPressed: () { Navigator.pop(dialogContext); widget.onComplete?.call(); }, child: Text('ابدأ التعلم', style: ar(13, color: primary, weight: FontWeight.w700)))],
     ));
   }
 
@@ -846,12 +852,12 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
           ),
         ),
       ] else if (isReading) ...[
-        Text('اقرئي القطعة ثم أجيبي عن السؤال.', style: ar(14, weight: FontWeight.w700)), const SizedBox(height: 12), _Card(child: Text('Learning a language takes practice. Small daily conversations can help you become more confident and understand people from different cultures.', style: en(15, color: inkSoft).copyWith(height: 1.7))), const SizedBox(height: 14), _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('What helps you become more confident?', style: en(15, weight: FontWeight.w700)), const SizedBox(height: 12), ...['Small daily conversations', 'Watching no videos', 'Avoiding practice'].map((item) => ListTile(contentPadding: EdgeInsets.zero, title: Text(item, style: en(13)), onTap: () => submitReading(item)))])),
+        Text('اقرأ القطعة ثم أجب عن السؤال.', style: ar(14, weight: FontWeight.w700)), const SizedBox(height: 12), _Card(child: Text('Learning a language takes practice. Small daily conversations can help you become more confident and understand people from different cultures.', style: en(15, color: inkSoft).copyWith(height: 1.7))), const SizedBox(height: 14), _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('What helps you become more confident?', style: en(15, weight: FontWeight.w700)), const SizedBox(height: 12), ...['Small daily conversations', 'Watching no videos', 'Avoiding practice'].map((item) => ListTile(contentPadding: EdgeInsets.zero, title: Text(item, style: en(13)), onTap: () => submitReading(item)))])),
       ] else if (isListening) ...[
-        Text('اسمعي المقطع ثم اختاري المعنى الأقرب.', style: ar(14, weight: FontWeight.w700)),
+        Text('استمع إلى المقطع ثم اختر المعنى الأقرب.', style: ar(14, weight: FontWeight.w700)),
         const SizedBox(height: 12),
         _Card(child: Column(children: [
-          Text('شاهدي المقطع ثم اختاري الجملة التي تصف ما رأيتِه وسمعتِه.', textAlign: TextAlign.center, style: ar(13, color: inkSoft).copyWith(height: 1.6)),
+          Text('شاهد المقطع ثم اختر الجملة التي تصف ما رأيته وسمعته.', textAlign: TextAlign.center, style: ar(13, color: inkSoft).copyWith(height: 1.6)),
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
@@ -880,7 +886,10 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
           ...['A butterfly is flying over the flowers.', 'The person is driving a car.', 'The room is completely empty.'].map((item) => ListTile(contentPadding: EdgeInsets.zero, title: Text(item, style: en(13)), onTap: () { score += item.startsWith('A butterfly') ? 1 : 0; setState(() => section++); })),
         ])),
       ] else if (isSpeaking) ...[
-        Text('تحدثي لمدة 30–60 ثانية عن نفسك.', style: ar(14, weight: FontWeight.w700)), const SizedBox(height: 12), _Card(child: Column(children: [Text('Tell me about yourself.', textAlign: TextAlign.center, style: en(22, weight: FontWeight.w700, color: primary)), const SizedBox(height: 16), IconButton(onPressed: startSpeaking, icon: Icon(listening ? Icons.stop_circle : Icons.mic_rounded, color: listening ? rust : primary, size: 58)), if (spokenText.isNotEmpty) Text(spokenText, textAlign: TextAlign.center, style: en(13, color: inkSoft).copyWith(height: 1.6)), const SizedBox(height: 8), Text('Grammar · Vocabulary · Fluency · Pronunciation · Naturalness', textAlign: TextAlign.center, style: ar(11, color: inkFaint))])),
+        Text('تحدث لمدة 30–60 ثانية عن نفسك.', style: ar(14, weight: FontWeight.w700)), const SizedBox(height: 12), _Card(child: Column(children: [Text('Tell me about yourself.', textAlign: TextAlign.center, style: en(22, weight: FontWeight.w700, color: primary)), const SizedBox(height: 16), IconButton(onPressed: startSpeaking, icon: Icon(listening ? Icons.stop_circle : Icons.mic_rounded, color: listening ? rust : primary, size: 58)), if (spokenText.isNotEmpty) ...[
+          TextButton.icon(onPressed: () => setState(() => showSpokenText = !showSpokenText), icon: Icon(showSpokenText ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 17), label: Text(showSpokenText ? 'إخفاء كلامك' : 'إظهار كلامك', style: ar(11.5, color: primary))),
+          if (showSpokenText) Text(spokenText, textAlign: TextAlign.center, style: en(13, color: inkSoft).copyWith(height: 1.6)),
+        ], const SizedBox(height: 8), Text('Grammar · Vocabulary · Fluency · Pronunciation · Naturalness', textAlign: TextAlign.center, style: ar(11, color: inkFaint))])),
         const SizedBox(height: 18), FilledButton(onPressed: analyzing || spokenText.trim().isEmpty ? null : finish, style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.all(16)), child: Text(analyzing ? 'جارٍ تحليل إجابتك...' : 'حلّل مستواي بالـAI', style: ar(14, weight: FontWeight.w700, color: Colors.white))),
       ] else ...[],
     ]));
