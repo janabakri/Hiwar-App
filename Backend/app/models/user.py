@@ -31,7 +31,7 @@ class User(Base):
     email_verified = Column(Boolean, default=False, nullable=False)
     
     # Level and progress
-    level = Column(String(20), default="intermediate")
+    level = Column(String(20), default="pending")
     level_score = Column(Integer, default=0)
     
     # Statistics

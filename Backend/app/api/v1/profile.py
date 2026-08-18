@@ -120,6 +120,9 @@ def _send_verification_email(email: str, code: str) -> bool:
 
 
 def _serialize(user: User):
+    honest_level = user.level
+    if (user.level or '').strip().lower() in {'', 'intermediate', 'pending'} and (user.level_score or 0) <= 0:
+        honest_level = 'pending'
     return {
         "user_id": user.user_id,
         "name": user.name,
@@ -130,8 +133,8 @@ def _serialize(user: User):
         "learning_reason": user.learning_reason,
         "daily_minutes": user.daily_minutes,
         "focus_skills": user.focus_skills,
-        "level": user.level,
-        "level_score": user.level_score,
+        "level": honest_level,
+        "level_score": user.level_score or 0,
         "total_sessions": user.total_sessions,
         "streak_days": user.streak_days,
         "profile_complete": bool(user.profile_complete),

@@ -101,7 +101,7 @@ class TestChatEndpoint:
         user = test_db.query(User).filter(User.user_id == "new_user_123").first()
         assert user is not None
         assert user.name.startswith("User_")
-        assert user.level == "intermediate"
+        assert user.level == "pending"
 
     @pytest.mark.asyncio
     async def test_chat_uses_existing_user(self, test_db):

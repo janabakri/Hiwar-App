@@ -42,7 +42,7 @@ async def chat(
         user = User(
             user_id=request.user_id,
             name=f"User_{request.user_id[:5]}",
-            level="intermediate"
+            level="pending"
         )
         db.add(user)
         db.commit()
@@ -52,7 +52,8 @@ async def chat(
     # 2. Detect errors
     errors = detect_errors(request.message)
     
-    # 3. Save errors to database
+    # 3. Save errors to database and keep only new corrections for this response.
+    fresh_errors = []
     for error_data in errors:
         # Check if error already exists for this user
         existing_error = db.query(UserError).filter(
@@ -77,12 +78,15 @@ async def chat(
                 context=request.message
             )
             db.add(new_error)
+            fresh_errors.append(error_data)
             print(f"📝 New error saved: {new_error.wrong_text}")
     
     db.commit()
     
-    # 4. Get AI response
-    reply = "Your message was received. I can help you improve it with gentle corrections."
+    # 4. Get AI response calibrated to the stored level.
+    assessed_level = (user.level or '').strip().lower()
+    tutor_level = assessed_level if assessed_level not in {'', 'pending', 'intermediate'} or (user.level_score or 0) > 0 else 'not assessed yet'
+    reply = "Thanks for sharing. Tell me a little more so we can keep practicing."
 
     if settings.OPENAI_API_KEY:
         try:
@@ -92,15 +96,17 @@ async def chat(
             )
             
             prompt = f"""
-            You are an English teacher. Level: intermediate.
-            User message: {request.message}
-            
-            Detected errors: {errors}
+            You are an adaptive English conversation tutor. The learner's assessed level is: {tutor_level}.
+            Do not claim a higher level than the evidence supports. If the learner is not assessed yet, use simple, natural English and gather evidence gradually.
+            Learner message: {request.message}
+            New errors found in this message: {fresh_errors}
             
             Requirements:
-            1. Reply naturally in English
-            2. Correct errors gently
-            3. If error is repeated, point it out
+            1. Reply naturally at the learner's demonstrated level.
+            2. Correct only genuine grammar or vocabulary errors from this message, briefly and contextually.
+            3. Do not repeat a correction that is not in the new errors list.
+            4. Ask one fresh, relevant follow-up question; do not reuse a fixed prompt.
+            5. Do not make pronunciation claims from text alone.
             """
 
             response = client.chat.completions.create(
@@ -130,15 +136,17 @@ async def chat(
             "correct": e["correct_text"],
             "explanation": e["explanation"]
         }
-        for e in errors
+        for e in fresh_errors
     ]
     
-    # 6. Tips
+    # 6. Tips: avoid repeating a correction that was already logged.
     tips = []
-    if errors:
-        tips.append(f"📝 Found {len(errors)} error(s). Check corrections above.")
+    if fresh_errors:
+        tips.append(f"📝 لاحظت {len(fresh_errors)} ملاحظة جديدة في رسالتك.")
+    elif errors:
+        tips.append("تم تسجيل هذه الملاحظة سابقًا؛ ركّز على استخدامها في سياق جديد.")
     else:
-        tips.append("🌟 Great! No errors detected.")
+        tips.append("🌟 لم تظهر أخطاء واضحة في هذه الرسالة.")
     
     return ChatResponse(
         reply=reply,
