@@ -86,7 +86,7 @@ async def chat(
     # 4. Get AI response calibrated to the stored level.
     assessed_level = (user.level or '').strip().lower()
     tutor_level = assessed_level if assessed_level not in {'', 'pending', 'intermediate'} or (user.level_score or 0) > 0 else 'not assessed yet'
-    reply = "Thanks for sharing. Tell me a little more so we can keep practicing."
+    reply = 'تم استلام رسالتك، لكن المدرب الذكي غير مفعّل حاليًا. أضف مفتاح مزود AI صالحًا في Backend ثم أعد المحاولة.'
 
     if settings.OPENAI_API_KEY:
         try:
@@ -125,9 +125,9 @@ async def chat(
             print(f"AI chat provider error: {exc}")
             message = str(exc).lower()
             if '429' in message or 'quota' in message or 'insufficient_quota' in message:
-                reply = 'خدمة التحليل الذكي مشغولة حاليًا. تم حفظ رسالتك، حاول مرة أخرى بعد قليل.'
+                reply = 'لم يتمكن المدرب الذكي من الرد لأن رصيد مزود AI انتهى. جدّد الرصيد أو استخدم مفتاحًا صالحًا في Backend ثم أعد المحاولة.'
             else:
-                reply = 'تعذر الحصول على رد الذكاء الاصطناعي الآن، لكن يمكنك متابعة التدريب والمحاولة مرة أخرى.'
+                reply = 'تعذر الحصول على رد الذكاء الاصطناعي الآن. تحقق من إعدادات Backend ثم أعد المحاولة.'
     
     # 5. Prepare corrections
     corrections = [

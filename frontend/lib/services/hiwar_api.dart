@@ -52,8 +52,15 @@ class HiwarProfile {
   final bool profileComplete;
   final String level;
   final int levelScore;
+  final DateTime? createdAt;
 
-  const HiwarProfile({required this.userId, required this.name, this.email, this.age, this.educationLevel, this.certificates, this.learningReason, this.dailyMinutes, this.focusSkills, required this.profileComplete, required this.level, required this.levelScore});
+  const HiwarProfile({required this.userId, required this.name, this.email, this.age, this.educationLevel, this.certificates, this.learningReason, this.dailyMinutes, this.focusSkills, required this.profileComplete, required this.level, required this.levelScore, this.createdAt});
+
+  int get daysSinceJoined {
+    if (createdAt == null) return 0;
+    final days = DateTime.now().difference(createdAt!).inDays;
+    return days < 0 ? 0 : days;
+  }
 
   factory HiwarProfile.fromJson(Map<String, dynamic> json) => HiwarProfile(
     userId: '${json['user_id'] ?? ''}',
@@ -68,6 +75,7 @@ class HiwarProfile {
     profileComplete: json['profile_complete'] == true,
     level: '${json['level'] ?? 'pending'}',
     levelScore: (json['level_score'] as num?)?.toInt() ?? 0,
+    createdAt: DateTime.tryParse('${json['created_at'] ?? ''}'),
   );
 }
 
