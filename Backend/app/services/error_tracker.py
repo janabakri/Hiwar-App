@@ -5,10 +5,10 @@ Error detection and tracking service.
 import re
 from typing import List, Dict
 
-# Common error patterns (using lowercase since text is converted to lowercase for matching)
+# Common error patterns
 COMMON_ERRORS = [
     {
-        "pattern": r"\b(i am go)\b",
+        "pattern": r"\b(I am go)\b",
         "correct": "I am going",
         "type": "grammar",
         "explanation": "After 'am', use verb + ing"
