@@ -49,7 +49,7 @@ class _AuthGateState extends State<AuthGate> {
 
   bool _needsLevel(HiwarProfile value) {
     final level = value.level.trim().toLowerCase();
-    return value.levelScore <= 0 || level.isEmpty || level == 'pending' || level == 'intermediate';
+    return value.levelScore <= 0 || level.isEmpty || level == 'pending';
   }
 
   Future<void> _restore() async {

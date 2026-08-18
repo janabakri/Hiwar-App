@@ -158,6 +158,7 @@ def _serialize(user: User):
         "level_score": user.level_score or 0,
         "total_sessions": user.total_sessions,
         "streak_days": user.streak_days,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
         "profile_complete": bool(user.profile_complete),
     }
 
