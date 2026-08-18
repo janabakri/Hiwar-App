@@ -1,5 +1,6 @@
 // مرجع التصميم: نسخة Flutter من speak-app-prototype(2).html؛ RTL، هاتف دافئ، بطاقات بيضاء، بنفسجي #4B3F8F، شاشات home/voice/feedback/explore/progress/profile.
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -19,6 +20,15 @@ const coralTint = Color(0xFFFBE7DA);
 const rust = Color(0xFFB23B3B);
 const rustTint = Color(0xFFF8E7E6);
 const line = Color(0xFFE6E1DA);
+
+const _conversationTopics = <Map<String, String>>[
+  {'level': 'A1–A2', 'title': 'Talking about your daily routine'},
+  {'level': 'A2–B1', 'title': 'Planning a weekend trip'},
+  {'level': 'B1', 'title': 'Ordering food at a restaurant'},
+  {'level': 'B1–B2', 'title': 'Discussing a favorite movie'},
+  {'level': 'B2', 'title': 'Sharing a work or study goal'},
+  {'level': 'A2–B1', 'title': 'Describing your hometown'},
+];
 
 TextStyle ar(double size, {FontWeight weight = FontWeight.w400, Color color = ink}) => GoogleFonts.ibmPlexSansArabic(fontSize: size, fontWeight: weight, color: color);
 TextStyle en(double size, {FontWeight weight = FontWeight.w400, Color color = ink}) => GoogleFonts.ibmPlexSans(fontSize: size, fontWeight: weight, color: color);
@@ -96,10 +106,14 @@ class HomeContent extends StatelessWidget {
   final VoidCallback onVoice;
   const HomeContent({super.key, this.profile, required this.onVoice});
   @override
-  Widget build(BuildContext context) => ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 28), children: [
+  Widget build(BuildContext context) {
+    final rawLevel = profile?.level.trim().toLowerCase() ?? 'pending';
+    final hasAssessedLevel = (profile?.levelScore ?? 0) > 0 && rawLevel.isNotEmpty && rawLevel != 'pending' && rawLevel != 'intermediate';
+    final displayLevel = hasAssessedLevel ? profile!.level : 'لم يحدد بعد';
+    return ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 28), children: [
     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('مساء الخير، ${profile?.name ?? 'في حوار'}', style: ar(19, weight: FontWeight.w700)), Text('جاهز لمحادثة اليوم؟', style: ar(12.5, color: inkFaint))]), Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), decoration: BoxDecoration(color: coralTint, borderRadius: BorderRadius.circular(20)), child: Row(children: [const Icon(Icons.local_fire_department, color: Color(0xFFB5451A), size: 15), const SizedBox(width: 5), Text('12 يوم', style: ar(12.5, weight: FontWeight.w600, color: const Color(0xFFB5451A)))]))]),
     const SizedBox(height: 18),
-    _Card(child: Row(children: [ _Ring(value: '${profile?.levelScore ?? 0}%'), const SizedBox(width: 16), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${profile?.level ?? 'لم يحدد بعد'}', style: ar(14.5, weight: FontWeight.w700)), Text((profile?.levelScore ?? 0) > 0 ? 'نتيجتك من اختبار تحديد المستوى' : 'أكمل اختبار تحديد المستوى أولًا', style: ar(12, color: inkFaint)), const SizedBox(height: 5), Text((profile?.levelScore ?? 0) > 0 ? '${profile?.levelScore ?? 0} نقطة مستوى' : 'لا توجد نتيجة بعد', style: mono(11.5, weight: FontWeight.w600, color: primary))])])),
+    _Card(child: Row(children: [ _Ring(value: '${profile?.levelScore ?? 0}%'), const SizedBox(width: 16), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(displayLevel, style: ar(14.5, weight: FontWeight.w700)), Text(hasAssessedLevel ? 'نتيجتك من اختبار تحديد المستوى' : 'أكمل اختبار تحديد المستوى أولًا', style: ar(12, color: inkFaint)), const SizedBox(height: 5), Text(hasAssessedLevel ? '${profile?.levelScore ?? 0} نقطة مستوى' : 'لا توجد نتيجة بعد', style: mono(11.5, weight: FontWeight.w600, color: primary))])])),
     const SizedBox(height: 26),
     Column(children: [GestureDetector(onTap: onVoice, child: Container(width: 132, height: 132, decoration: const BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(center: Alignment(-.35, -.5), colors: [Color(0xFF6459A8), primary])), child: const Icon(Icons.mic_none, size: 44, color: Colors.white))), const SizedBox(height: 16), Text('ابدأ محادثة صوتية', style: ar(15.5, weight: FontWeight.w700)), const SizedBox(height: 3), Text('تحدّث بحرية، الذكاء الاصطناعي يستمع ويرد عليك', style: ar(12, color: inkFaint))]),
     _SectionTitle('مقترح اليوم', tag: 'مبني على أدائك'),
@@ -134,6 +148,8 @@ class _VoiceScreenState extends State<VoiceScreen> {
   String reply = '';
   List<String> tips = const [];
   int exchanges = 0;
+  bool submittedCurrent = false;
+  late final Map<String, String> sessionTopic = _conversationTopics[Random().nextInt(_conversationTopics.length)];
 
   @override
   void dispose() {
@@ -168,6 +184,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
     setState(() {
       active = true;
       listening = true;
+      submittedCurrent = false;
       showTranscript = false;
       status = 'أستمع إليك...';
       transcript = '';
@@ -190,12 +207,13 @@ class _VoiceScreenState extends State<VoiceScreen> {
   }
 
   Future<void> sendTranscript() async {
+    if (sending || submittedCurrent) return;
     final message = transcript.trim();
     if (message.isEmpty) {
       if (mounted) setState(() => status = 'حاول قول جملة قصيرة بالإنجليزي');
       return;
     }
-    setState(() { sending = true; status = 'يفكر بالرد...'; });
+    setState(() { sending = true; submittedCurrent = true; status = 'يفكر بالرد...'; });
     try {
       final userId = await widget.api.getStoredUserId() ?? await widget.api.getUserId();
       final result = await widget.api.sendChat(userId: userId, message: message);
@@ -213,7 +231,13 @@ class _VoiceScreenState extends State<VoiceScreen> {
       });
       await tts.setLanguage('en-US');
       await tts.setSpeechRate(0.45);
-      if (result.reply.trim().isNotEmpty) await tts.speak(result.reply);
+      await tts.setVolume(1.0);
+      await tts.setPitch(1.0);
+      await tts.awaitSpeakCompletion(true);
+      if (result.reply.trim().isNotEmpty) {
+        await tts.stop();
+        await tts.speak(result.reply);
+      }
     } catch (_) {
       if (mounted) setState(() { sending = false; status = 'تعذر الاتصال بالخادم'; });
     }
@@ -247,7 +271,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
         backgroundColor: bg,
         elevation: 0,
         leading: IconButton(icon: const Icon(Icons.close, color: ink), onPressed: () => Navigator.pop(context)),
-        title: Text('B1 · Ordering food at a restaurant', style: ar(12, color: inkFaint)),
+        title: Text('${sessionTopic['level']} · ${sessionTopic['title']}', style: ar(12, color: inkFaint)),
       ),
       body: Column(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
