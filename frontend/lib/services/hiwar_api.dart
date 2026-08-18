@@ -29,7 +29,7 @@ class HiwarStats {
     return HiwarStats(
       userId: '${json['user_id'] ?? ''}',
       userName: '${json['user_name'] ?? 'معلوماتي في Hiwar'}',
-      level: '${json['level'] ?? 'intermediate'}',
+      level: '${json['level'] ?? 'pending'}',
       levelScore: (json['level_score'] as num?)?.toInt() ?? 0,
       totalSessions: (json['total_sessions'] as num?)?.toInt() ?? 0,
       streakDays: (json['streak_days'] as num?)?.toInt() ?? 0,
@@ -66,7 +66,7 @@ class HiwarProfile {
     dailyMinutes: (json['daily_minutes'] as num?)?.toInt(),
     focusSkills: json['focus_skills'] as String?,
     profileComplete: json['profile_complete'] == true,
-    level: '${json['level'] ?? 'intermediate'}',
+    level: '${json['level'] ?? 'pending'}',
     levelScore: (json['level_score'] as num?)?.toInt() ?? 0,
   );
 }
