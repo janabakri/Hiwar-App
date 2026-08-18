@@ -80,15 +80,19 @@ class _AuthScreenState extends State<AuthScreen> {
       if (idToken == null || idToken.isEmpty) {
         throw Exception('Apple identity token is missing.');
       }
+      final appleUserId = credential.userIdentifier;
+      if (appleUserId == null || appleUserId.isEmpty) {
+        throw Exception('Apple user identifier is missing.');
+      }
       final given = credential.givenName?.trim() ?? '';
       final family = credential.familyName?.trim() ?? '';
       final displayName = [given, family].where((part) => part.isNotEmpty).join(' ');
       final profile = await widget.api.signIn(
-        userId: credential.userIdentifier,
+        userId: appleUserId,
         name: displayName.isEmpty ? 'مستخدم حوار' : displayName,
         email: credential.email,
         provider: 'apple',
-        subject: credential.userIdentifier,
+        subject: appleUserId,
         idToken: idToken,
       );
       await widget.api.saveUserId(profile.userId);
