@@ -1,4 +1,2 @@
-2026/08/17-21:00:26.206 2fd8 Reusing MANIFEST C:\Users\janab\AppData\Local\Temp\flutter_tools.555fd673\flutter_tools_chrome_device.f183d1f1\Default\shared_proto_db/MANIFEST-000001
-2026/08/17-21:00:26.206 2fd8 Recovering log #4
-2026/08/17-21:00:26.208 2fd8 Reusing old log C:\Users\janab\AppData\Local\Temp\flutter_tools.555fd673\flutter_tools_chrome_device.f183d1f1\Default\shared_proto_db/000004.log 
-2026/08/17-21:00:26.208 2fd8 Delete type=0 #3
+2026/08/18-12:58:32.499 38c4 Creating DB C:\Users\janab\AppData\Local\Temp\flutter_tools.aa3da5b1\flutter_tools_chrome_device.e7482a06\Default\shared_proto_db since it was missing.
+2026/08/18-12:58:32.547 38c4 Reusing MANIFEST C:\Users\janab\AppData\Local\Temp\flutter_tools.aa3da5b1\flutter_tools_chrome_device.e7482a06\Default\shared_proto_db/MANIFEST-000001
