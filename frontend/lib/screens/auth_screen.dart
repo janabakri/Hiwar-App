@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../services/hiwar_api.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -69,6 +70,34 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  Future<void> _finishApple() async {
+    try {
+      setState(() { busy = true; error = null; });
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [AppleIDAuthorizationScopes.email, AppleIDAuthorizationScopes.fullName],
+      );
+      final idToken = credential.identityToken;
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('Apple identity token is missing.');
+      }
+      final given = credential.givenName?.trim() ?? '';
+      final family = credential.familyName?.trim() ?? '';
+      final displayName = [given, family].where((part) => part.isNotEmpty).join(' ');
+      final profile = await widget.api.signIn(
+        userId: credential.userIdentifier,
+        name: displayName.isEmpty ? 'مستخدم حوار' : displayName,
+        email: credential.email,
+        provider: 'apple',
+        subject: credential.userIdentifier,
+        idToken: idToken,
+      );
+      await widget.api.saveUserId(profile.userId);
+      if (mounted) widget.onSignedIn(profile);
+    } catch (_) {
+      if (mounted) setState(() { busy = false; error = 'لم يكتمل تسجيل Apple. تأكد من إعداد Sign in with Apple في Apple Developer وجرّب على iPhone.'; });
+    }
+  }
+
   Future<void> _manualSignIn() async {
     if (email.text.trim().isEmpty || password.text.length < 8) {
       setState(() => error = 'أدخل البريد وكلمة المرور الصحيحة.');
@@ -115,7 +144,12 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Widget _socialButton() {
-    return SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: busy ? null : _finishGoogle, icon: const Text('G', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF4285F4))), label: Text('المتابعة باستخدام Google', style: arabic(13.5, weight: FontWeight.w700)), style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF241F38), side: const BorderSide(color: Color(0xFFE1DBD3)), padding: const EdgeInsets.all(16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)))));
+    final style = OutlinedButton.styleFrom(foregroundColor: const Color(0xFF241F38), side: const BorderSide(color: Color(0xFFE1DBD3)), padding: const EdgeInsets.all(16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)));
+    return Column(children: [
+      SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: busy ? null : _finishGoogle, icon: const Text('G', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF4285F4))), label: Text('المتابعة باستخدام Google', style: arabic(13.5, weight: FontWeight.w700)), style: style)),
+      const SizedBox(height: 10),
+      SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: busy ? null : _finishApple, icon: const Text('', style: TextStyle(fontSize: 22, color: Colors.black)), label: Text('المتابعة باستخدام Apple', style: arabic(13.5, weight: FontWeight.w700)), style: style)),
+    ]);
   }
 
   @override
