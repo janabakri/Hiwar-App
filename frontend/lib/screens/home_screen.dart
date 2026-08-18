@@ -52,7 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final pages = [
       HomeContent(profile: widget.profile, onVoice: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => VoiceScreen(api: _api)))),
       ExploreContent(),
-      ProgressContent(onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: widget.profile?.userId)))),
+      ProgressContent(profile: widget.profile, onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: widget.profile?.userId)))),
       ProfileContent(api: _api, profile: widget.profile),
     ];
     return Directionality(
@@ -492,19 +492,22 @@ class _Skill extends StatelessWidget {
 }
 
 class ProgressContent extends StatelessWidget {
+  final HiwarProfile? profile;
   final VoidCallback? onLevelCheck;
-  const ProgressContent({super.key, this.onLevelCheck});
+  const ProgressContent({super.key, this.profile, this.onLevelCheck});
   @override
-  Widget build(BuildContext context) => ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 28), children: [
+  Widget build(BuildContext context) {
+    final level = profile?.level.trim().isNotEmpty == true && profile!.level != 'pending' ? profile!.level : 'لم يحدد بعد';
+    final days = profile?.daysSinceJoined ?? 0;
+    return ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 28), children: [
     const _SectionTitle('تقدّم'),
-    _Card(child: Row(children: [const _Ring(value: '480', label: 'XP'), const SizedBox(width: 16), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('B1 — متوسط', style: ar(14.5, weight: FontWeight.w700)), Text('12 يوم متتالي · 34 محادثة', style: ar(12, color: inkFaint))])])),
+    _Card(child: Row(children: [_Ring(value: '${profile?.levelScore ?? 0}%', label: 'المستوى'), const SizedBox(width: 16), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(level, style: ar(14.5, weight: FontWeight.w700)), Text(days == 0 ? 'ابدأ أول جلسة لك' : 'عضو منذ $days يوم', style: ar(12, color: inkFaint))])])),
     const SizedBox(height: 14),
     _Card(onTap: onLevelCheck, child: Row(children: [const _LevelMeterArt(size: 58), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('حدد مستواك من جديد', style: ar(14, weight: FontWeight.w700)), Text('اختبار قصير يعطيك مسارًا أدق', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left, color: inkFaint)])),
     const _SectionTitle('سجل الأخطاء المتكررة'),
-    const _Card(child: ListTile(contentPadding: EdgeInsets.zero, leading: CircleAvatar(radius: 12, backgroundColor: rustTint, child: Text('×7', style: TextStyle(color: rust, fontSize: 11))), title: Text('Present Perfect vs Past Simple'), subtitle: Text('أكثر خطأ تكرر معك هذا الشهر'))),
-    const SizedBox(height: 12),
-    const _Card(child: ListTile(contentPadding: EdgeInsets.zero, leading: CircleAvatar(radius: 12, backgroundColor: rustTint, child: Text('×4', style: TextStyle(color: rust, fontSize: 11))), title: Text('نطق حرف th'), subtitle: Text('تحسّن ملحوظ عن الشهر الماضي'))),
+    _Card(child: ListTile(contentPadding: EdgeInsets.zero, leading: const CircleAvatar(radius: 12, backgroundColor: primaryTint, child: Icon(Icons.auto_awesome, size: 15, color: primary)), title: const Text('سجل أخطائك يظهر هنا'), subtitle: Text('بعد أول محادثة ستجد ملاحظاتك الحقيقية هنا', style: ar(11.5, color: inkFaint)))),
   ]);
+  }
 }
 
 class ProfileContent extends StatefulWidget {
