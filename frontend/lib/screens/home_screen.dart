@@ -413,11 +413,17 @@ class ProfileContent extends StatefulWidget {
 
 class _ProfileContentState extends State<ProfileContent> {
   HiwarStats? stats;
+  HiwarProfile? editedProfile;
   String? error;
   bool loading = true;
+  bool reminderEnabled = true;
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    editedProfile = widget.profile;
+    _load();
+  }
 
   Future<void> _load() async {
     try {
@@ -431,9 +437,48 @@ class _ProfileContentState extends State<ProfileContent> {
 
   String _value(String? value) => value == null || value.trim().isEmpty ? 'غير محدد' : value;
 
+  Future<void> _editProfile() async {
+    final current = editedProfile ?? widget.profile;
+    if (current == null) return;
+    final name = TextEditingController(text: current.name);
+    final age = TextEditingController(text: current.age?.toString() ?? '');
+    final certificates = TextEditingController(text: current.certificates ?? '');
+    String education = current.educationLevel ?? 'متوسط';
+    final updated = await showDialog<HiwarProfile>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('تعديل معلوماتي', style: ar(17, weight: FontWeight.w800)),
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: name, decoration: const InputDecoration(labelText: 'الاسم')),
+            TextField(controller: age, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'العمر')),
+            DropdownButtonFormField<String>(value: education, decoration: const InputDecoration(labelText: 'المرحلة الدراسية'), items: const ['مبتدئ', 'متوسط', 'متقدم'].map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(), onChanged: (value) { if (value != null) setDialogState(() => education = value); }),
+            TextField(controller: certificates, decoration: const InputDecoration(labelText: 'الشهادات (اختياري)')),
+          ])),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text('إلغاء', style: ar(13, color: inkFaint))),
+            FilledButton(onPressed: () async {
+              if (name.text.trim().isEmpty) return;
+              try {
+                final result = await widget.api.updateProfile(userId: current.userId, name: name.text.trim(), age: int.tryParse(age.text.trim()), educationLevel: education, certificates: certificates.text.trim());
+                if (dialogContext.mounted) Navigator.pop(dialogContext, result);
+              } catch (_) {
+                if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(const SnackBar(content: Text('تعذر حفظ معلوماتك، حاول مرة أخرى.')));
+              }
+            }, child: Text('حفظ', style: ar(13, weight: FontWeight.w700, color: Colors.white))),
+          ],
+        ),
+      ),
+    );
+    name.dispose();
+    age.dispose();
+    certificates.dispose();
+    if (updated != null && mounted) setState(() => editedProfile = updated);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final profile = widget.profile;
+    final profile = editedProfile ?? widget.profile;
     final score = profile?.levelScore ?? stats?.levelScore ?? 0;
     final level = score > 0 ? (profile?.level ?? stats?.level ?? 'لم يحدد بعد') : 'لم يحدد بعد';
     final name = profile?.name ?? stats?.userName ?? 'معلوماتي في حوار';
@@ -452,7 +497,7 @@ class _ProfileContentState extends State<ProfileContent> {
           ])),
           Container(width: 64, height: 64, decoration: const BoxDecoration(color: primary, shape: BoxShape.circle), child: Center(child: Text(initial, style: ar(24, weight: FontWeight.w800, color: Colors.white)))),
           const SizedBox(width: 10),
-          IconButton(onPressed: () {}, icon: const Icon(Icons.edit_outlined, color: inkSoft, size: 20)),
+          IconButton(onPressed: _editProfile, tooltip: 'تعديل المعلومات', icon: const Icon(Icons.edit_outlined, color: inkSoft, size: 20)),
         ]),
       ])),
       const SizedBox(height: 14),
@@ -472,11 +517,11 @@ class _ProfileContentState extends State<ProfileContent> {
       ])),
       const _SectionTitle('التدريب'),
       _Card(child: Column(children: [
-        _TrainingRow(icon: Icons.access_time_rounded, title: 'الهدف اليومي', value: profile?.dailyMinutes == null ? 'غير محدد' : '${profile!.dailyMinutes} دقيقة'),
+        _TrainingRow(icon: Icons.access_time_rounded, title: 'الهدف اليومي', value: profile?.dailyMinutes == null ? 'غير محدد' : '${profile!.dailyMinutes} دقيقة', onTap: _editProfile),
         const Divider(height: 1, color: line),
-        _TrainingRow(icon: Icons.mic_none_rounded, title: 'لهجة الذكاء الاصطناعي', value: 'American'),
+        _TrainingRow(icon: Icons.mic_none_rounded, title: 'لهجة الذكاء الاصطناعي', value: 'American', onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('إعداد اللهجة سيتوفر قريبًا.')))),
         const Divider(height: 1, color: line),
-        _TrainingRow(icon: Icons.notifications_none_rounded, title: 'تذكير المحادثة اليومية', value: 'مفعّل', trailing: Switch(value: true, onChanged: (_) {})),
+        _TrainingRow(icon: Icons.notifications_none_rounded, title: 'تذكير المحادثة اليومية', value: reminderEnabled ? 'مفعّل' : 'متوقف', trailing: Switch(value: reminderEnabled, onChanged: (value) => setState(() => reminderEnabled = value)), onTap: () => setState(() => reminderEnabled = !reminderEnabled)),
       ])),
       const _SectionTitle('معلوماتي الشخصية'),
       _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -525,9 +570,12 @@ class _TrainingRow extends StatelessWidget {
   final String title;
   final String value;
   final Widget? trailing;
-  const _TrainingRow({required this.icon, required this.title, required this.value, this.trailing});
+  final VoidCallback? onTap;
+  const _TrainingRow({required this.icon, required this.title, required this.value, this.trailing, this.onTap});
   @override
-  Widget build(BuildContext context) => SizedBox(
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: SizedBox(
     height: 62,
     child: Row(children: [
       Icon(icon, color: inkSoft, size: 21),
@@ -537,7 +585,7 @@ class _TrainingRow extends StatelessWidget {
       const SizedBox(width: 8),
       const Icon(Icons.chevron_left_rounded, color: inkFaint, size: 20),
     ]),
-  );
+  ));
 }
 
 
