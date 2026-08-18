@@ -4,7 +4,8 @@ The current app uses a trusted client user_id; production Google token verificat
 should be added before exposing this API publicly.
 """
 from datetime import datetime, timedelta
-from jose import jwt
+from jose import jwt, jwk
+import httpx
 from typing import Optional
 import base64
 import hashlib
@@ -81,6 +82,26 @@ def _verify_password(password: str, encoded: str) -> bool:
         return hmac.compare_digest(actual, expected)
     except (ValueError, TypeError):
         return False
+
+
+def _verify_apple_token(raw_token: Optional[str]) -> dict:
+    if not raw_token or not settings.APPLE_CLIENT_ID:
+        raise HTTPException(status_code=401, detail="Apple Sign-In is not configured")
+    try:
+        header = jwt.get_unverified_header(raw_token)
+        keys = httpx.get("https://appleid.apple.com/auth/keys", timeout=8).json().get("keys", [])
+        key_data = next((item for item in keys if item.get("kid") == header.get("kid")), None)
+        if not key_data:
+            raise HTTPException(status_code=401, detail="Invalid Apple token key")
+        signing_key = jwk.construct(key_data, header.get("alg", "RS256"))
+        claims = jwt.decode(raw_token, signing_key, algorithms=[header.get("alg", "RS256")], audience=settings.APPLE_CLIENT_ID, issuer="https://appleid.apple.com")
+        if not claims.get("sub"):
+            raise HTTPException(status_code=401, detail="Invalid Apple identity")
+        return claims
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail="Invalid Apple token") from exc
 
 
 def _verify_google_token(raw_token: Optional[str]) -> dict:
@@ -205,11 +226,19 @@ def password_sign_in(request: PasswordSignInRequest, db: Session = Depends(get_d
 
 @router.post("/auth/sign-in")
 def sign_in(request: SignInRequest, db: Session = Depends(get_db)):
-    claims = _verify_google_token(request.id_token) if request.auth_provider == 'google' else {}
+    if request.auth_provider == 'google':
+        claims = _verify_google_token(request.id_token)
+        stable_prefix = 'google'
+    elif request.auth_provider == 'apple':
+        claims = _verify_apple_token(request.id_token)
+        stable_prefix = 'apple'
+    else:
+        claims = {}
+        stable_prefix = request.auth_provider or 'manual'
     verified_email = claims.get('email') if claims else request.email
     verified_subject = claims.get('sub') if claims else request.auth_subject
     verified_name = claims.get('name') or request.name
-    stable_user_id = f"google-{verified_subject}" if verified_subject else request.user_id
+    stable_user_id = f"{stable_prefix}-{verified_subject}" if verified_subject else request.user_id
     user = db.query(User).filter(User.user_id == stable_user_id).first()
     if not user:
         user = User(user_id=stable_user_id, name=verified_name)
