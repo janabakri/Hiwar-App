@@ -394,8 +394,60 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   }
 }
 
-class _ReviewCard extends StatelessWidget {final String number,wrong,correct,explain;const _ReviewCard({required this.number,required this.wrong,required this.correct,required this.explain});@override Widget build(BuildContext context)=>Padding(padding:const EdgeInsets.only(bottom:12),child:_Card(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(children:[CircleAvatar(radius:12,backgroundColor:rustTint,child:Text(number,style:mono(11,color:rust))),const SizedBox(width:10),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('"$wrong"',style:en(13.5,color:rust).copyWith(decoration:TextDecoration.lineThrough)),Text('✓ $correct',style:en(13.5,weight:FontWeight.w600,color:primaryDark))]))]),const Divider(height:20,color:line),Text(explain,style:ar(12.5,color:inkSoft).copyWith(height:1.7))])));}
-class _WordChip extends StatelessWidget {final String text;const _WordChip(this.text);@override Widget build(BuildContext context)=>Container(padding:const EdgeInsets.symmetric(horizontal:13,vertical:8),decoration:BoxDecoration(color:paper,border:Border.all(color:line),borderRadius:BorderRadius.circular(20)),child:Text(text,style:ar(12.5)));}
+class _ReviewCard extends StatelessWidget {
+  final String number;
+  final String wrong;
+  final String correct;
+  final String explain;
+
+  const _ReviewCard({required this.number, required this.wrong, required this.correct, required this.explain});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: _Card(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(radius: 12, backgroundColor: rustTint, child: Text(number, style: mono(11, color: rust))),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('"$wrong"', style: en(13.5, color: rust).copyWith(decoration: TextDecoration.lineThrough)),
+                      Text('✓ $correct', style: en(13.5, weight: FontWeight.w600, color: primaryDark)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 20, color: line),
+            Text(explain, style: ar(12.5, color: inkSoft).copyWith(height: 1.7)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WordChip extends StatelessWidget {
+  final String text;
+
+  const _WordChip(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+      decoration: BoxDecoration(color: paper, border: Border.all(color: line), borderRadius: BorderRadius.circular(20)),
+      child: Text(text, style: ar(12.5)),
+    );
+  }
+}
 
 class ExploreContent extends StatelessWidget {
   @override
@@ -404,13 +456,39 @@ class ExploreContent extends StatelessWidget {
     Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(gradient: const LinearGradient(colors: [primaryDark, primary]), borderRadius: BorderRadius.circular(18)), child: Row(children: [
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('✦ اقتراح ذكي لك', style: ar(11, weight: FontWeight.w700, color: Colors.white)), const SizedBox(height: 8), Text('بناءً على محادثاتك الأخيرة، ركّزي هالأسبوع على Present Perfect ونطق حرف th — قبل ما ننتقل لمهارة جديدة.', style: ar(13, color: Colors.white).copyWith(height: 1.6))])),
       const SizedBox(width: 8),
-      const _SparkleArt(),
+      _SparkleArt(),
     ])),
     const SizedBox(height: 16),
     GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1.05, children: [_Skill(title: 'التحدث', english: 'Speaking', value: 70, color: primaryTint), _Skill(title: 'الاستماع', english: 'Listening', value: 55, color: const Color(0xFFE7EEF7)), _Skill(title: 'القراءة', english: 'Reading', value: 48, color: const Color(0xFFF7EEDB)), _Skill(title: 'الكتابة', english: 'Writing', value: 40, color: const Color(0xFFF6E6EB)), _Skill(title: 'القواعد', english: 'Grammar', value: 58, color: const Color(0xFFE9E7F2)), _Skill(title: 'المفردات', english: 'Vocabulary', value: 65, color: const Color(0xFFF8E7E6))],),
   ]);
 }
-class _Skill extends StatelessWidget {final String title,english;final int value;final Color color;const _Skill({required this.title,required this.english,required this.value,required this.color});@override Widget build(BuildContext context)=>_Card(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Container(width:38,height:38,decoration:BoxDecoration(color:color,borderRadius:BorderRadius.circular(11)),child:const Icon(Icons.auto_awesome_outlined,size:19,color:primary)),const SizedBox(height:9),Text(title,style:ar(13.5,weight:FontWeight.w700)),Text(english,style:en(11,color:inkFaint)),const Spacer(),ClipRRect(borderRadius:BorderRadius.circular(5),child:LinearProgressIndicator(value:value/100,minHeight:5,backgroundColor:line,color:primary)),const SizedBox(height:5),Text('$value%',style:mono(10.5,color:inkFaint))]));}
+class _Skill extends StatelessWidget {
+  final String title;
+  final String english;
+  final int value;
+  final Color color;
+
+  const _Skill({required this.title, required this.english, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return _Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(width: 38, height: 38, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(11)), child: const Icon(Icons.auto_awesome_outlined, size: 19, color: primary)),
+          const SizedBox(height: 9),
+          Text(title, style: ar(13.5, weight: FontWeight.w700)),
+          Text(english, style: en(11, color: inkFaint)),
+          const Spacer(),
+          ClipRRect(borderRadius: BorderRadius.circular(5), child: LinearProgressIndicator(value: value / 100, minHeight: 5, backgroundColor: line, color: primary)),
+          const SizedBox(height: 5),
+          Text('$value%', style: mono(10.5, color: inkFaint)),
+        ],
+      ),
+    );
+  }
+}
 
 class ProgressContent extends StatelessWidget {
   final VoidCallback? onLevelCheck;
