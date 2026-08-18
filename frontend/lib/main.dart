@@ -47,19 +47,24 @@ class _AuthGateState extends State<AuthGate> {
 
   @override void initState() { super.initState(); _restore(); }
 
+  bool _needsLevel(HiwarProfile value) {
+    final level = value.level.trim().toLowerCase();
+    return value.levelScore <= 0 || level.isEmpty || level == 'pending' || level == 'intermediate';
+  }
+
   Future<void> _restore() async {
     welcomeSeen = await api.hasSeenWelcome();
     final userId = await api.getStoredUserId();
     if (userId != null && userId.isNotEmpty) {
       try {
         profile = await api.getProfile(userId);
-        needsLevelCheck = profile!.levelScore <= 0 || profile!.level.toLowerCase() == 'pending' || profile!.level.toLowerCase() == 'intermediate';
+        needsLevelCheck = _needsLevel(profile!);
       } catch (_) { profile = null; }
     }
     if (mounted) setState(() => loading = false);
   }
 
-  void _signedIn(HiwarProfile next) => setState(() { profile = next; needsLevelCheck = next.levelScore <= 0 || next.level.toLowerCase() == 'pending' || next.level.toLowerCase() == 'intermediate'; });
+  void _signedIn(HiwarProfile next) => setState(() { profile = next; needsLevelCheck = _needsLevel(next); });
 
   void _onOnboardingComplete(HiwarProfile next) => setState(() { profile = next; needsLevelCheck = true; });
 
@@ -68,9 +73,9 @@ class _AuthGateState extends State<AuthGate> {
     if (id == null) return;
     try {
       final updated = await api.getProfile(id);
-      if (mounted) setState(() { profile = updated; needsLevelCheck = false; });
+      if (mounted) setState(() { profile = updated; needsLevelCheck = _needsLevel(updated); });
     } catch (_) {
-      if (mounted) setState(() => needsLevelCheck = false);
+      if (mounted) setState(() => needsLevelCheck = true);
     }
   }
 
