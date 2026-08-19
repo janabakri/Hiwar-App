@@ -105,7 +105,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'gender': _gender,
             'city': _cityController.text,
             'goal': _goal,
-            'level': _level,
             'interest': _interest,
           },
         );
@@ -213,14 +212,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ? (value) => setState(() => _goal = value!)
                             : null,
                       ),
-                      _buildDropdown(
-                        label: 'مستواك الحالي',
-                        value: _level,
-                        options: _levelOptions,
-                        onChanged: _isEditing
-                            ? (value) => setState(() => _level = value!)
-                            : null,
-                      ),
+                      _buildReadOnlyLevel(),
                     ]),
 
                     const SizedBox(height: 24),
@@ -340,6 +332,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (value?.isEmpty ?? true) return 'هذا الحقل مطلوب';
           return null;
         },
+      ),
+    );
+  }
+
+  Widget _buildReadOnlyLevel() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'نتيجة اختبار تحديد المستوى',
+          labelStyle: TextStyle(color: Colors.grey.shade400),
+          prefixIcon: Icon(Icons.assessment_outlined, color: Colors.grey.shade400, size: 20),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade800),
+          ),
+          filled: true,
+          fillColor: const Color(0xFF1A1A2E),
+        ),
+        child: Text(
+          _level,
+          style: const TextStyle(color: Colors.white),
+        ),
       ),
     );
   }
