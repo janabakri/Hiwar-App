@@ -102,8 +102,10 @@ class HiwarChatResult {
   final String reply;
   final List<Map<String, String>> corrections;
   final List<String> tips;
+  final int? conversationId;
+  final int? messageId;
 
-  const HiwarChatResult({required this.reply, required this.corrections, required this.tips});
+  const HiwarChatResult({required this.reply, required this.corrections, required this.tips, this.conversationId, this.messageId});
 
   factory HiwarChatResult.fromJson(Map<String, dynamic> json) {
     final rawCorrections = (json['corrections'] as List?) ?? const [];
@@ -118,6 +120,8 @@ class HiwarChatResult {
         };
       }).toList(),
       tips: ((json['tips'] as List?) ?? const []).map((tip) => '$tip').toList(),
+      conversationId: (json['conversation_id'] as num?)?.toInt(),
+      messageId: (json['message_id'] as num?)?.toInt(),
     );
   }
 }
@@ -210,8 +214,12 @@ class HiwarApi {
     return ((data['errors'] as List?) ?? const []).map((item) => HiwarError.fromJson(Map<String, dynamic>.from(item as Map))).toList();
   }
 
-  Future<HiwarChatResult> sendChat({required String userId, required String message}) async {
-    final response = await _dio.post('/api/v1/chat', data: {'message': message, 'user_id': userId});
+  Future<HiwarChatResult> sendChat({required String userId, required String message, int? conversationId}) async {
+    final response = await _dio.post('/api/v1/chat', data: {
+      'message': message,
+      'user_id': userId,
+      if (conversationId != null) 'conversation_id': conversationId,
+    });
     return HiwarChatResult.fromJson(Map<String, dynamic>.from(response.data as Map));
   }
 
