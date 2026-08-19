@@ -68,6 +68,7 @@ class Settings:
     SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
     SMTP_FROM: str = os.getenv("SMTP_FROM", "")
+    SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "حوار App")
 
 
 settings = Settings()
