@@ -143,7 +143,7 @@ class _AuthScreenState extends State<AuthScreen> {
       await widget.api.saveUserId(profile.userId);
       if (mounted) widget.onSignedIn(profile);
     } catch (_) {
-      if (mounted) setState(() { busy = false; error = 'رمز التحقق غير صحيح أو منتهي.'; });
+      if (mounted) setState(() { busy = false; error = 'الرمز غير صحيح أو منتهي. استخدم آخر رمز وصلك وتأكد من البريد المستخدم.'; });
     }
   }
 
