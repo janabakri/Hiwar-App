@@ -10,7 +10,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from services.error_tracker import detect_errors, COMMON_ERRORS
+from app.services.error_tracker import detect_errors, COMMON_ERRORS
 
 
 class TestErrorDetection:
