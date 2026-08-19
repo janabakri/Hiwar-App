@@ -49,7 +49,9 @@ class _AuthGateState extends State<AuthGate> {
 
   bool _needsLevel(HiwarProfile value) {
     final level = value.level.trim().toLowerCase();
-    return value.levelScore <= 0 || level.isEmpty || level == 'pending';
+    final asksAiToAssess = (value.focusSkills ?? '').contains('ما أعرف');
+    final hasNoResult = value.levelScore <= 0 || level.isEmpty || level == 'pending';
+    return asksAiToAssess && hasNoResult;
   }
 
   Future<void> _restore() async {
@@ -66,16 +68,18 @@ class _AuthGateState extends State<AuthGate> {
 
   void _signedIn(HiwarProfile next) => setState(() { profile = next; needsLevelCheck = _needsLevel(next); });
 
-  void _onOnboardingComplete(HiwarProfile next) => setState(() { profile = next; needsLevelCheck = true; });
+  void _onOnboardingComplete(HiwarProfile next) => setState(() { profile = next; needsLevelCheck = _needsLevel(next); });
 
   Future<void> _onLevelComplete() async {
     final id = profile?.userId;
+    if (mounted) setState(() => needsLevelCheck = false);
     if (id == null) return;
     try {
       final updated = await api.getProfile(id);
-      if (mounted) setState(() { profile = updated; needsLevelCheck = _needsLevel(updated); });
+      if (mounted) setState(() { profile = updated; needsLevelCheck = false; });
     } catch (_) {
-      if (mounted) setState(() => needsLevelCheck = true);
+      // The result was already saved; keep the user in the app even if refresh fails.
+      if (mounted) setState(() => needsLevelCheck = false);
     }
   }
 
