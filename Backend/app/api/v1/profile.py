@@ -13,6 +13,7 @@ import hmac
 import secrets
 import smtplib
 from email.message import EmailMessage
+from email.utils import formataddr
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -129,7 +130,8 @@ def _send_verification_email(email: str, code: str) -> bool:
         return False
     message = EmailMessage()
     message['Subject'] = 'رمز التحقق من حوار App'
-    message['From'] = settings.SMTP_FROM or settings.SMTP_USERNAME
+    sender_email = settings.SMTP_FROM or settings.SMTP_USERNAME
+    message['From'] = formataddr((settings.SMTP_FROM_NAME, sender_email))
     message['To'] = email
     message.set_content(f'رمز التحقق الخاص بك في حوار App هو: {code}\n\nينتهي الرمز خلال 10 دقائق.')
     with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15) as smtp:
