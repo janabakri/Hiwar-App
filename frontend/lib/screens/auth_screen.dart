@@ -126,9 +126,9 @@ class _AuthScreenState extends State<AuthScreen> {
     try {
       final result = await widget.api.signUp(name: name.text.trim(), email: email.text.trim(), password: password.text);
       final sent = result['sent'] == true;
-      if (mounted) setState(() { busy = false; waitingForCode = sent; error = sent ? null : 'لم يتم إرسال البريد. يجب إعداد SMTP في Backend أولًا.'; });
+      if (mounted) setState(() { busy = false; waitingForCode = sent; error = sent ? null : 'تعذر إرسال رمز التحقق. حاول مرة أخرى.'; });
     } catch (_) {
-      if (mounted) setState(() { busy = false; error = 'تعذر إنشاء الحساب. تحقق من البريد أو تشغيل Backend.'; });
+      if (mounted) setState(() { busy = false; error = 'تعذر إنشاء الحساب. حاول مرة أخرى أو استخدم بريدًا مختلفًا.'; });
     }
   }
 
