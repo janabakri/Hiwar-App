@@ -52,7 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final pages = [
       HomeContent(profile: widget.profile, onVoice: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => VoiceScreen(api: _api)))),
       ExploreContent(),
-      ProgressContent(profile: widget.profile, onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: widget.profile?.userId)))),
+      ProgressContent(profile: widget.profile, onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: widget.profile?.userId, focusSkills: widget.profile?.focusSkills, onComplete: () => Navigator.of(context).pop())))),
       ProfileContent(api: _api, profile: widget.profile),
     ];
     return Directionality(
@@ -800,8 +800,9 @@ class _AnalysisRow extends StatelessWidget {
 class LevelCheckScreen extends StatefulWidget {
   final HiwarApi? api;
   final String? userId;
+  final String? focusSkills;
   final VoidCallback? onComplete;
-  const LevelCheckScreen({super.key, this.api, this.userId, this.onComplete});
+  const LevelCheckScreen({super.key, this.api, this.userId, this.focusSkills, this.onComplete});
   @override
   State<LevelCheckScreen> createState() => _LevelCheckScreenState();
 }
@@ -821,6 +822,9 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
   late final VideoPlayerController videoController;
   bool videoReady = false;
   bool videoFailed = false;
+  late List<String> listeningOptions;
+
+  bool get aiChoosesSkill => (widget.focusSkills ?? '').contains('ما أعرف');
 
   Future<void> submitReading(String answer) async {
     score += answer.startsWith('Small') ? 1 : 0;
@@ -858,6 +862,9 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
     super.initState();
     grammar.shuffle();
     vocabulary.shuffle();
+    listeningOptions = aiChoosesSkill
+        ? ['They are practicing ordering coffee.', 'They are discussing a flight cancellation.', 'They are watching a football match.']
+        : ['They are practicing ordering coffee.', 'A butterfly is flying over the flowers.', 'The room is completely empty.'];
     videoController = VideoPlayerController.networkUrl(Uri.parse('https://files.manuscdn.com/user_upload_by_module/session_file/310519663817005648/YIdthPewveYCAiqF.mp4'))
       ..initialize().then((_) { if (mounted) setState(() => videoReady = true); }).catchError((_) { if (mounted) setState(() => videoFailed = true); });
   }
@@ -1011,7 +1018,7 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
         Text('استمع إلى المقطع ثم اختر المعنى الأقرب.', style: ar(14, weight: FontWeight.w700)),
         const SizedBox(height: 12),
         _Card(child: Column(children: [
-          Text('شاهد المقطع ثم اختر الجملة التي تصف ما رأيته وسمعته.', textAlign: TextAlign.center, style: ar(13, color: inkSoft).copyWith(height: 1.6)),
+          Text(aiChoosesSkill ? 'اختار لك الـAI سؤالًا مختلفًا يناسب تقييمك. شاهد المقطع ثم اختر المعنى الأقرب.' : 'شاهد المقطع ثم اختر الجملة التي تصف ما سمعته في الحوار.', textAlign: TextAlign.center, style: ar(13, color: inkSoft).copyWith(height: 1.6)),
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
@@ -1037,7 +1044,7 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
           const SizedBox(height: 10),
           FilledButton.icon(onPressed: videoReady ? playListeningClip : null, icon: Icon(playingListening ? Icons.pause_rounded : Icons.play_arrow_rounded), label: Text(playingListening ? 'إيقاف الفيديو' : 'تشغيل الفيديو', style: ar(12, weight: FontWeight.w700)), style: FilledButton.styleFrom(backgroundColor: primaryTint, foregroundColor: primary)),
           const SizedBox(height: 10),
-          ...['A butterfly is flying over the flowers.', 'The person is driving a car.', 'The room is completely empty.'].map((item) => ListTile(contentPadding: EdgeInsets.zero, title: Text(item, style: en(13)), onTap: () { score += item.startsWith('A butterfly') ? 1 : 0; setState(() => section++); })),
+          ...listeningOptions.map((item) => ListTile(contentPadding: EdgeInsets.zero, title: Text(item, style: en(13)), onTap: () { score += item == listeningOptions.first ? 1 : 0; setState(() => section++); })),
         ])),
       ] else if (isSpeaking) ...[
         Text('تحدث لمدة 30–60 ثانية عن نفسك.', style: ar(14, weight: FontWeight.w700)), const SizedBox(height: 12), _Card(child: Column(children: [Text('Tell me about yourself.', textAlign: TextAlign.center, style: en(22, weight: FontWeight.w700, color: primary)), const SizedBox(height: 16), IconButton(onPressed: startSpeaking, icon: Icon(listening ? Icons.stop_circle : Icons.mic_rounded, color: listening ? rust : primary, size: 58)), if (spokenText.isNotEmpty) ...[

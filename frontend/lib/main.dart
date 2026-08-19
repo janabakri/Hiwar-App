@@ -84,7 +84,7 @@ class _AuthGateState extends State<AuthGate> {
     if (profile == null && !welcomeSeen) return WelcomeScreen(onContinue: () async { await api.markWelcomeSeen(); if (mounted) setState(() => welcomeSeen = true); });
     if (profile == null) return AuthScreen(api: api, onSignedIn: _signedIn);
     if (!profile!.profileComplete) return OnboardingScreen(api: api, profile: profile!, onComplete: _onOnboardingComplete);
-    if (needsLevelCheck) return LevelCheckScreen(api: api, userId: profile!.userId, onComplete: _onLevelComplete);
+    if (needsLevelCheck) return LevelCheckScreen(api: api, userId: profile!.userId, focusSkills: profile!.focusSkills, onComplete: _onLevelComplete);
     return HomeScreen(profile: profile);
   }
 }
