@@ -69,6 +69,11 @@ class ProfileUpdateRequest(BaseModel):
     focus_skills: Optional[str] = Field(default=None, max_length=500)
 
 
+def _normalize_verification_code(value: str) -> str:
+    digit_map = str.maketrans('٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹', '01234567890123456789')
+    return ''.join(value.translate(digit_map).split())
+
+
 def _hash_password(password: str) -> str:
     salt = secrets.token_bytes(16)
     digest = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 120_000)
@@ -133,7 +138,7 @@ def _send_verification_email(email: str, code: str) -> bool:
     sender_email = settings.SMTP_FROM or settings.SMTP_USERNAME
     message['From'] = formataddr((settings.SMTP_FROM_NAME, sender_email))
     message['To'] = email
-    message.set_content(f'رمز التحقق الخاص بك في حوار App هو: {code}\n\nينتهي الرمز خلال 10 دقائق.')
+    message.set_content(f'رمز التحقق الخاص بك في حوار App هو: {code}\n\nينتهي الرمز خلال 10 دقائق. إذا طلبت رمزًا جديدًا، استخدم آخر رمز وصلك فقط.')
     with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15) as smtp:
         smtp.starttls()
         if settings.SMTP_USERNAME:
@@ -195,8 +200,10 @@ def sign_up(request: SignUpRequest, db: Session = Depends(get_db)):
 
 @router.post("/auth/verify-email")
 def verify_email(request: VerifyEmailRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == request.email.strip().lower()).first()
-    if not user or user.verification_code != request.code or not user.verification_expires_at or user.verification_expires_at < datetime.utcnow():
+    email = request.email.strip().lower()
+    code = _normalize_verification_code(request.code)
+    user = db.query(User).filter(User.email == email).first()
+    if not user or _normalize_verification_code(user.verification_code or '') != code or not user.verification_expires_at or user.verification_expires_at < datetime.utcnow():
         raise HTTPException(status_code=400, detail="رمز التحقق غير صحيح أو منتهي")
     user.email_verified = True
     user.verification_code = None
