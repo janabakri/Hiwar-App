@@ -149,6 +149,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
   String reply = '';
   List<String> tips = const [];
   int exchanges = 0;
+  int? conversationId;
   bool submittedCurrent = false;
   late final Map<String, String> sessionTopic = _conversationTopics[Random().nextInt(_conversationTopics.length)];
 
@@ -217,9 +218,10 @@ class _VoiceScreenState extends State<VoiceScreen> {
     setState(() { sending = true; submittedCurrent = true; status = 'يفكر بالرد...'; });
     try {
       final userId = await widget.api.getStoredUserId() ?? await widget.api.getUserId();
-      final result = await widget.api.sendChat(userId: userId, message: message);
+      final result = await widget.api.sendChat(userId: userId, message: message, conversationId: conversationId);
       if (!mounted) return;
       setState(() {
+        conversationId ??= result.conversationId;
         reply = result.reply;
         corrections
           ..clear()
