@@ -1,5 +1,6 @@
 // مرجع التكامل: Hiwar FastAPI تحت /api/v1؛ إحصائيات الحساب من GET /stats/{user_id}.
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -143,7 +144,9 @@ class HiwarApi {
 
   static String _apiBaseUrl() {
     final configured = dotenv.isInitialized ? dotenv.env['API_BASE_URL'] : null;
-    return configured == null || configured.trim().isEmpty ? 'http://localhost:8000' : configured.trim();
+    if (configured != null && configured.trim().isNotEmpty) return configured.trim();
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) return 'http://10.0.2.2:8000';
+    return 'http://localhost:8000';
   }
 
   String get baseUrl => _dio.options.baseUrl;
