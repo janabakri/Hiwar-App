@@ -46,7 +46,7 @@ class Settings:
     # App
     APP_NAME: str = os.getenv("APP_NAME", "Hiwar App")
     APP_VERSION: str = os.getenv("APP_VERSION", "1.0.0")
-    DEBUG: bool = os.getenv("DEBUG", "True").lower() in {"1", "true", "yes", "on"}
+    DEBUG: bool = os.getenv("DEBUG", "False").lower() in {"1", "true", "yes", "on"}
 
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./app.db")
