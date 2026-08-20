@@ -2,37 +2,32 @@
 Chat API endpoints with database integration.
 """
 
-import json
-from datetime import datetime
-from typing import Dict, List, Optional
-
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import List, Dict, Optional
+from datetime import datetime
 
 from ...core.database import get_db
 from ...core.config import settings
 from ...services.error_tracker import detect_errors
 from ...models.user import User
 from ...models.error import UserError
-from ...models.conversation import Conversation, Message
+from ...models.conversation import ConversationTurn
 from openai import OpenAI
 
 router = APIRouter()
 
 # === Data Models ===
 class ChatMessage(BaseModel):
-    message: str = Field(min_length=1, max_length=4000)
-    user_id: str = Field(min_length=1, max_length=50)
-    conversation_id: Optional[int] = None
-
+    message: str
+    user_id: str
 
 class ChatResponse(BaseModel):
     reply: str
-    corrections: List[Dict[str, str]] = Field(default_factory=list)
-    tips: List[str] = Field(default_factory=list)
-    conversation_id: Optional[int] = None
-    message_id: Optional[int] = None
+    corrections: List[Dict] = []
+    tips: List[str] = []
 
 # === API Endpoints ===
 
@@ -56,34 +51,7 @@ async def chat(
         db.refresh(user)
         print(f"✅ New user created: {user.user_id}")
     
-    # 2. Load or create a durable conversation and save the learner turn.
-    conversation = None
-    if request.conversation_id is not None:
-        conversation = db.query(Conversation).filter(
-            Conversation.id == request.conversation_id,
-            Conversation.user_id == user.id,
-            Conversation.is_active == 1,
-        ).first()
-    if conversation is None:
-        conversation = db.query(Conversation).filter(
-            Conversation.user_id == user.id,
-            Conversation.is_active == 1,
-        ).order_by(Conversation.updated_at.desc()).first()
-    if conversation is None:
-        conversation = Conversation(user_id=user.id)
-        db.add(conversation)
-        db.flush()
-
-    previous_messages = db.query(Message).filter(
-        Message.conversation_id == conversation.id,
-    ).order_by(Message.created_at.desc()).limit(6).all()
-    previous_messages.reverse()
-    user_message = Message(conversation_id=conversation.id, role="user", content=request.message)
-    db.add(user_message)
-    db.flush()
-    context_messages = [{"role": item.role, "content": item.content} for item in previous_messages]
-
-    # 3. Detect errors
+    # 2. Detect errors
     errors = detect_errors(request.message)
     
     # 3. Save errors to database and keep only new corrections for this response.
@@ -117,12 +85,16 @@ async def chat(
     
     db.commit()
     
-    # 4. Get AI response calibrated to the stored level.
+    # 4. Load durable conversational memory for adaptive context.
+    recent_turns = list(reversed(db.query(ConversationTurn).filter(
+        ConversationTurn.user_id == user.id
+    ).order_by(desc(ConversationTurn.created_at)).limit(8).all()))
+    history = [{'role': turn.role, 'content': turn.content} for turn in recent_turns]
+
+    # 5. Get AI response calibrated to the stored level.
     assessed_level = (user.level or '').strip().lower()
     tutor_level = assessed_level if assessed_level not in {'', 'pending', 'intermediate'} or (user.level_score or 0) > 0 else 'not assessed yet'
     reply = 'تم استلام رسالتك، لكن المدرب الذكي غير مفعّل حاليًا. أضف مفتاح مزود AI صالحًا في Backend ثم أعد المحاولة.'
-    ai_tips: List[str] = []
-    structured_corrections: List[Dict[str, str]] = []
 
     if settings.OPENAI_API_KEY:
         try:
@@ -134,7 +106,6 @@ async def chat(
             prompt = f"""
             You are an adaptive English conversation tutor. The learner's assessed level is: {tutor_level}.
             Do not claim a higher level than the evidence supports. If the learner is not assessed yet, use simple, natural English and gather evidence gradually.
-            Recent conversation context (oldest to newest): {context_messages}
             Learner message: {request.message}
             New errors found in this message: {fresh_errors}
             
@@ -147,31 +118,20 @@ async def chat(
             """
 
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
+                model=settings.OPENAI_MODEL,
+                messages=[
+                    {"role": "system", "content": "You are an adaptive English conversation tutor."},
+                    *history,
+                    {"role": "user", "content": prompt},
+                ],
                 temperature=0.7,
-                max_tokens=500,
-                response_format={"type": "json_object"},
+                max_tokens=300
             )
-
-            raw_output = response.choices[0].message.content or ""
-            parsed = json.loads(raw_output)
-            if isinstance(parsed.get("reply"), str) and parsed["reply"].strip():
-                reply = parsed["reply"].strip()
-            if isinstance(parsed.get("corrections"), list):
-                structured_corrections = [
-                    {
-                        "wrong": str(item.get("wrong", "")),
-                        "correct": str(item.get("correct", "")),
-                        "explanation": str(item.get("explanation", "")),
-                    }
-                    for item in parsed["corrections"]
-                    if isinstance(item, dict) and item.get("wrong") and item.get("correct")
-                ]
-            ai_tips = [str(item) for item in parsed.get("tips", []) if item]
-        except (json.JSONDecodeError, TypeError, ValueError) as exc:
-            print(f"AI structured output error: {exc}")
-            ai_tips = []
+            
+            ai_reply = response.choices[0].message.content
+            if ai_reply:
+                reply = ai_reply
+                
         except Exception as exc:
             # Do not expose provider keys, quota details, or stack traces to app users.
             print(f"AI chat provider error: {exc}")
@@ -181,8 +141,15 @@ async def chat(
             else:
                 reply = 'تعذر الحصول على رد الذكاء الاصطناعي الآن. تحقق من إعدادات Backend ثم أعد المحاولة.'
     
-    # 5. Prepare corrections
-    corrections = structured_corrections or [
+    # 6. Persist this turn so future sessions can use real memory.
+    db.add(ConversationTurn(user_id=user.id, role='user', content=request.message))
+    db.add(ConversationTurn(user_id=user.id, role='assistant', content=reply))
+    user.total_sessions = (user.total_sessions or 0) + 1
+    user.last_active = datetime.utcnow()
+    db.commit()
+
+    # 7. Prepare corrections
+    corrections = [
         {
             "wrong": e["wrong_text"],
             "correct": e["correct_text"],
@@ -191,29 +158,19 @@ async def chat(
         for e in fresh_errors
     ]
     
-    # 6. Tips: keep deterministic feedback and append structured provider tips.
-    tips = list(ai_tips)
-    if not tips:
-        if fresh_errors:
-            tips.append(f"📝 لاحظت {len(fresh_errors)} ملاحظة جديدة في رسالتك.")
-        elif errors:
-            tips.append("تم تسجيل هذه الملاحظة سابقًا؛ ركّز على استخدامها في سياق جديد.")
-        else:
-            tips.append("🌟 لم تظهر أخطاء واضحة في هذه الرسالة.")
-
-    assistant_message = Message(conversation_id=conversation.id, role="assistant", content=reply)
-    db.add(assistant_message)
-    conversation.updated_at = datetime.utcnow()
-    user.last_active = datetime.utcnow()
-    db.commit()
-    db.refresh(assistant_message)
-
+    # 8. Tips: avoid repeating a correction that was already logged.
+    tips = []
+    if fresh_errors:
+        tips.append(f"📝 لاحظت {len(fresh_errors)} ملاحظة جديدة في رسالتك.")
+    elif errors:
+        tips.append("تم تسجيل هذه الملاحظة سابقًا؛ ركّز على استخدامها في سياق جديد.")
+    else:
+        tips.append("🌟 لم تظهر أخطاء واضحة في هذه الرسالة.")
+    
     return ChatResponse(
         reply=reply,
         corrections=corrections,
-        tips=tips,
-        conversation_id=conversation.id,
-        message_id=assistant_message.id,
+        tips=tips
     )
 
 

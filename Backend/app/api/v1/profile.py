@@ -236,6 +236,8 @@ def password_sign_in(request: PasswordSignInRequest, db: Session = Depends(get_d
 
 @router.post("/auth/sign-in")
 def sign_in(request: SignInRequest, db: Session = Depends(get_db)):
+    if request.auth_provider not in {'google', 'apple'}:
+        raise HTTPException(status_code=400, detail='استخدم تسجيل الدخول بالبريد أو Google أو Apple')
     if request.auth_provider == 'google':
         claims = _verify_google_token(request.id_token)
         stable_prefix = 'google'
