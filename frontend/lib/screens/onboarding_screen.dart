@@ -165,7 +165,7 @@ class _BasicStep extends StatelessWidget {
       const SizedBox(height: 18),
       Text('كيف تصف مستواك بشكل مبدئي؟', style: ar(13, weight: FontWeight.w700)),
       const SizedBox(height: 12),
-      ...['مبتدئ', 'متوسط', 'متقدم'].map((item) {
+      ...['مبتدئ', 'أساسي', 'متوسط', 'متقدم'].map((item) {
         final selected = item == education;
         return Padding(
           padding: const EdgeInsets.only(bottom: 10),
@@ -184,7 +184,11 @@ class _BasicStep extends StatelessWidget {
               child: Row(children: [
                 Text(_optionEmoji(item), style: const TextStyle(fontSize: 24)),
                 const SizedBox(width: 13),
-                Expanded(child: Text(item, style: ar(14, weight: FontWeight.w700))),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(item, style: ar(14, weight: FontWeight.w700)),
+                  const SizedBox(height: 3),
+                  Text(_levelDescription(item), style: ar(11.5, color: _faint)),
+                ])),
                 Icon(selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: selected ? _primary : _faint),
               ]),
             ),
@@ -240,10 +244,27 @@ class _OptionsStep extends StatelessWidget {
   }
 }
 
+String _levelDescription(String item) {
+  switch (item) {
+    case 'مبتدئ':
+      return 'أبدأ من الصفر';
+    case 'أساسي':
+      return 'أعرف بعض الكلمات';
+    case 'متوسط':
+      return 'أستطيع التحدث عن مواضيع بسيطة';
+    case 'متقدم':
+      return 'أتحدث بطلاقة';
+    default:
+      return '';
+  }
+}
+
 String _optionEmoji(String item) {
   switch (item) {
     case 'مبتدئ':
       return '🌱';
+    case 'أساسي':
+      return '📖';
     case 'متوسط':
       return '💬';
     case 'متقدم':
