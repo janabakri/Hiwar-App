@@ -151,7 +151,36 @@ class _VoiceScreenState extends State<VoiceScreen> {
   int exchanges = 0;
   int? conversationId;
   bool submittedCurrent = false;
+  bool openingPlayed = false;
   late final Map<String, String> sessionTopic = _conversationTopics[Random().nextInt(_conversationTopics.length)];
+
+  @override
+  void initState() {
+    super.initState();
+    _speakOpening();
+  }
+
+  Future<void> _speakOpening() async {
+    if (openingPlayed) return;
+    openingPlayed = true;
+    final opening = switch (sessionTopic['title']) {
+      'Daily life' => 'Hi! Let\'s talk about your day. What was the best part of it?',
+      'Travel' => 'Hi! Let\'s talk about travel. Where would you love to go next?',
+      'Work & goals' => 'Hi! Let\'s talk about your goals. What are you working toward right now?',
+      'Food & culture' => 'Hi! Let\'s talk about food. What is a dish you really enjoy?',
+      'Technology' => 'Hi! Let\'s talk about technology. What app do you use every day?',
+      _ => 'Hi! I\'m ready to practice English with you. Tell me something about your day.',
+    };
+    if (mounted) setState(() => status = 'المدرب يبدأ المحادثة...');
+    await tts.setLanguage('en-US');
+    await tts.setSpeechRate(0.45);
+    await tts.setVolume(1.0);
+    await tts.setPitch(1.0);
+    await tts.awaitSpeakCompletion(true);
+    if (!mounted) return;
+    await tts.speak(opening);
+    if (mounted && !listening && !sending) setState(() => status = 'اضغط للبدء بالحديث');
+  }
 
   @override
   void dispose() {
@@ -163,6 +192,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
 
   Future<void> toggleListening() async {
     if (sending) return;
+    await tts.stop();
     if (listening) {
       await speech.stop();
       if (mounted) setState(() { listening = false; status = 'جاري تحليل كلامك...'; });
