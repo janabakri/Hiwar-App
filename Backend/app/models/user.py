@@ -47,3 +47,4 @@ class User(Base):
     
     # Relationships
     errors = relationship("UserError", back_populates="user")
+    conversation_turns = relationship("ConversationTurn", back_populates="user", cascade="all, delete-orphan")
