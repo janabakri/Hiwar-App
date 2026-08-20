@@ -164,8 +164,33 @@ class _BasicStep extends StatelessWidget {
       _Field(controller: age, label: 'العمر', hint: 'اختياري', keyboard: TextInputType.number),
       const SizedBox(height: 18),
       Text('كيف تصف مستواك بشكل مبدئي؟', style: ar(13, weight: FontWeight.w700)),
-      const SizedBox(height: 10),
-      Wrap(spacing: 8, runSpacing: 8, children: ['مبتدئ', 'متوسط', 'متقدم'].map((item) => ChoiceChip(label: Text(item, style: ar(12)), selected: item == education, selectedColor: _tint, onSelected: (_) => onEducation(item))).toList()),
+      const SizedBox(height: 12),
+      ...['مبتدئ', 'متوسط', 'متقدم'].map((item) {
+        final selected = item == education;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: InkWell(
+            onTap: () => onEducation(item),
+            borderRadius: BorderRadius.circular(16),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+              decoration: BoxDecoration(
+                color: selected ? _tint : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: selected ? _primary : _line, width: selected ? 1.5 : 1),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(.025), blurRadius: 10, offset: const Offset(0, 4))],
+              ),
+              child: Row(children: [
+                Text(_optionEmoji(item), style: const TextStyle(fontSize: 24)),
+                const SizedBox(width: 13),
+                Expanded(child: Text(item, style: ar(14, weight: FontWeight.w700))),
+                Icon(selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: selected ? _primary : _faint),
+              ]),
+            ),
+          ),
+        );
+      }),
     ]);
   }
 }
@@ -185,8 +210,72 @@ class _OptionsStep extends StatelessWidget {
       const SizedBox(height: 7),
       Text(subtitle, style: ar(13, color: _faint)),
       const SizedBox(height: 20),
-      ...options.map((item) => Padding(padding: const EdgeInsets.only(bottom: 10), child: InkWell(onTap: () => onToggle(item), borderRadius: BorderRadius.circular(15), child: AnimatedContainer(duration: const Duration(milliseconds: 160), padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14), decoration: BoxDecoration(color: selected.contains(item) ? _tint : Colors.white, border: Border.all(color: selected.contains(item) ? _primary : _line, width: selected.contains(item) ? 1.5 : 1), borderRadius: BorderRadius.circular(15)), child: Row(children: [Expanded(child: Text(item, style: ar(13, weight: FontWeight.w600))), Icon(selected.contains(item) ? Icons.check_circle_rounded : Icons.circle_outlined, color: selected.contains(item) ? _primary : _faint)]))))),
+      ...options.map((item) {
+        final isSelected = selected.contains(item);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: InkWell(
+            onTap: () => onToggle(item),
+            borderRadius: BorderRadius.circular(16),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+              decoration: BoxDecoration(
+                color: isSelected ? _tint : Colors.white,
+                border: Border.all(color: isSelected ? _primary : _line, width: isSelected ? 1.5 : 1),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(.025), blurRadius: 10, offset: const Offset(0, 4))],
+              ),
+              child: Row(children: [
+                Text(_optionEmoji(item), style: const TextStyle(fontSize: 22)),
+                const SizedBox(width: 12),
+                Expanded(child: Text(item, style: ar(13, weight: FontWeight.w700))),
+                Icon(isSelected ? Icons.check_circle_rounded : Icons.circle_outlined, color: isSelected ? _primary : _faint),
+              ]),
+            ),
+          ),
+        );
+      }),
     ]);
+  }
+}
+
+String _optionEmoji(String item) {
+  switch (item) {
+    case 'مبتدئ':
+      return '🌱';
+    case 'متوسط':
+      return '💬';
+    case 'متقدم':
+      return '🚀';
+    case 'العمل والترقية':
+      return '💼';
+    case 'الدراسة':
+      return '🎓';
+    case 'السفر':
+      return '✈️';
+    case 'المقابلات الوظيفية':
+      return '🧑‍💻';
+    case 'تطوير اللغة بشكل عام':
+      return '🌎';
+    case 'أخرى':
+      return '✨';
+    case 'Speaking':
+      return '🗣️';
+    case 'Listening':
+      return '🎧';
+    case 'Grammar':
+      return '📚';
+    case 'Vocabulary':
+      return '🧠';
+    case 'Pronunciation':
+      return '🔊';
+    case 'Writing':
+      return '✍️';
+    case 'ما أعرف، خل الـAI يحدد لي':
+      return '🤖';
+    default:
+      return '•';
   }
 }
 
