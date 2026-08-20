@@ -873,7 +873,7 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
     listeningOptions = aiChoosesSkill
         ? ['They are practicing ordering coffee.', 'They are discussing a flight cancellation.', 'They are watching a football match.']
         : ['They are practicing ordering coffee.', 'A butterfly is flying over the flowers.', 'The room is completely empty.'];
-    videoController = VideoPlayerController.networkUrl(Uri.parse('https://files.manuscdn.com/user_upload_by_module/session_file/310519663817005648/YIdthPewveYCAiqF.mp4'))
+    videoController = VideoPlayerController.asset('assets/hiwar-english-conversation.mp4')
       ..initialize().then((_) { if (mounted) setState(() => videoReady = true); }).catchError((_) { if (mounted) setState(() => videoFailed = true); });
   }
 
@@ -979,7 +979,9 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
 
   Widget _buildResultView() {
     final percent = resultScore.clamp(0, 100);
-    return ListView(padding: const EdgeInsets.fromLTRB(20, 14, 20, 30), children: [
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 30),
+      children: [
       Row(children: [
         IconButton(onPressed: () => widget.onComplete?.call(), icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19, color: ink)),
         Expanded(child: Text('نتيجة تحديد المستوى', textAlign: TextAlign.center, style: ar(17, weight: FontWeight.w800))),
@@ -1021,7 +1023,7 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
       ])),
       const SizedBox(height: 18),
       SizedBox(width: double.infinity, child: FilledButton(onPressed: widget.onComplete, style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: Text('ابدأ التعلم', style: ar(14, weight: FontWeight.w800, color: Colors.white)))),
-    ];
+    ]);
   }
 
   @override
@@ -1034,7 +1036,23 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
     final isSpeaking = section == 4;
     final totalSections = 5;
     return Scaffold(backgroundColor: bg, appBar: AppBar(backgroundColor: bg, elevation: 0, title: Text('تحديد المستوى', style: ar(16, weight: FontWeight.w700))), body: ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 30), children: [
-      Row(children: List.generate(totalSections, (index) => Expanded(child: Container(margin: EdgeInsets.only(left: index == totalSections - 1 ? 0 : 4), height: 5, decoration: BoxDecoration(color: index <= section ? primary : line, borderRadius: BorderRadius.circular(5))))),
+      Row(
+        children: List.generate(
+          totalSections,
+          (index) => Expanded(
+            child: Container(
+              margin: EdgeInsets.only(
+                left: index == totalSections - 1 ? 0 : 4,
+              ),
+              height: 5,
+              decoration: BoxDecoration(
+                color: index <= section ? primary : line,
+                borderRadius: BorderRadius.circular(5),
+              ),
+            ),
+          ),
+        ),
+      ),
       const SizedBox(height: 10),
       Text('المرحلة ${section + 1} من $totalSections', textAlign: TextAlign.center, style: ar(11.5, color: inkFaint, weight: FontWeight.w600)),
       const SizedBox(height: 18),
