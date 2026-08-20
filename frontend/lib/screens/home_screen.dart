@@ -813,6 +813,11 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
   int section = 0;
   int question = 0;
   int score = 0;
+  int answeredQuestions = 0;
+  bool showResult = false;
+  int resultScore = 0;
+  int resultKnowledgeScore = 0;
+  String resultLevel = '';
   bool listening = false;
   final stt.SpeechToText speech = stt.SpeechToText();
   final FlutterTts tts = FlutterTts();
@@ -829,6 +834,7 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
   bool get aiChoosesSkill => (widget.focusSkills ?? '').contains('ما أعرف');
 
   Future<void> submitReading(String answer) async {
+    answeredQuestions++;
     score += answer.startsWith('Small') ? 1 : 0;
     if (widget.api != null && widget.userId != null) {
       try {
@@ -877,6 +883,7 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
   List<Map<String, Object>> get currentQuestions => section == 0 ? grammar : vocabulary;
 
   void answer(int index) {
+    answeredQuestions++;
     if (index == currentQuestions[question]['correct']) score++;
     if (question < currentQuestions.length - 1) { setState(() => question++); return; }
     setState(() { section++; question = 0; });
@@ -944,39 +951,93 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
     final aiLevelIsValid = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].any((level) => remoteLevel.startsWith(level));
     final estimated = aiLevelIsValid ? remoteLevel : computedLevel;
     try { await widget.api!.saveLevelResult(userId: widget.userId!, level: estimated, score: finalScore); } catch (_) {}
-    if (mounted) setState(() => analyzing = false);
     if (!mounted) return;
-    showDialog(context: context, barrierDismissible: false, builder: (dialogContext) => AlertDialog(
-      title: Text('نتيجتك: $estimated', style: ar(18, weight: FontWeight.w800)),
-      content: SizedBox(width: 330, child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('${speakingAnalysis['feedback'] ?? 'تحليل AI جاهز.'}', style: ar(13, color: inkSoft).copyWith(height: 1.7)),
-        const SizedBox(height: 14),
-        _AnalysisRow(label: 'النتيجة العامة', value: '$finalScore / 100'),
-        _AnalysisRow(label: 'نتيجة المعرفة', value: '$knowledgeScore / 100'),
-        _AnalysisRow(label: 'المستوى المحسوب', value: computedLevel),
-        _AnalysisRow(label: 'القواعد', value: '${speakingAnalysis['grammar_score'] ?? '—'}'),
-        _AnalysisRow(label: 'المفردات', value: '${speakingAnalysis['vocabulary_score'] ?? '—'}'),
-        _AnalysisRow(label: 'الطلاقة', value: '${speakingAnalysis['fluency_score'] ?? '—'}'),
-        _AnalysisRow(label: 'تركيب الجمل', value: '${speakingAnalysis['sentence_structure_score'] ?? '—'}'),
-        _AnalysisRow(label: 'الطبيعية', value: '${speakingAnalysis['naturalness_score'] ?? '—'}'),
-        const SizedBox(height: 8),
-        Text('ملاحظة: تقييم النطق يحتاج تسجيلًا صوتيًا مخصصًا، أما هذا التحليل فمبني على النص المنطوق.', style: ar(11, color: inkFaint).copyWith(height: 1.6)),
-      ]))),
-      actions: [TextButton(onPressed: () { Navigator.pop(dialogContext); widget.onComplete?.call(); }, child: Text('ابدأ التعلم', style: ar(13, color: primary, weight: FontWeight.w700)))],
-    ));
+    setState(() {
+      analyzing = false;
+      resultScore = finalScore;
+      resultKnowledgeScore = knowledgeScore;
+      resultLevel = estimated;
+      showResult = true;
+    });
   }
 
   TextStyle ar(double size, {FontWeight weight = FontWeight.w400, Color color = ink}) => GoogleFonts.ibmPlexSansArabic(fontSize: size, fontWeight: weight, color: color);
 
+  Widget _resultMetric(String label, String value) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+        decoration: BoxDecoration(color: paper, borderRadius: BorderRadius.circular(16), border: Border.all(color: line)),
+        child: Column(children: [
+          Text(value, style: mono(16, color: primary)),
+          const SizedBox(height: 4),
+          Text(label, textAlign: TextAlign.center, style: ar(11, color: inkFaint)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildResultView() {
+    final percent = resultScore.clamp(0, 100);
+    return ListView(padding: const EdgeInsets.fromLTRB(20, 14, 20, 30), children: [
+      Row(children: [
+        IconButton(onPressed: () => widget.onComplete?.call(), icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19, color: ink)),
+        Expanded(child: Text('نتيجة تحديد المستوى', textAlign: TextAlign.center, style: ar(17, weight: FontWeight.w800))),
+        const SizedBox(width: 48),
+      ]),
+      const SizedBox(height: 12),
+      Container(
+        padding: const EdgeInsets.fromLTRB(20, 26, 20, 22),
+        decoration: BoxDecoration(color: paper, borderRadius: BorderRadius.circular(28), border: Border.all(color: line)),
+        child: Column(children: [
+          Container(width: 104, height: 104, decoration: BoxDecoration(color: primary, shape: BoxShape.circle, boxShadow: [BoxShadow(color: primary.withOpacity(.25), blurRadius: 22, offset: const Offset(0, 10))]), child: Center(child: Text('$percent%', style: ar(24, weight: FontWeight.w800, color: Colors.white)))),
+          const SizedBox(height: 16),
+          Text('مستواك التقديري', style: ar(12, color: inkFaint)),
+          const SizedBox(height: 4),
+          Text('$resultLevel', style: ar(22, weight: FontWeight.w800, color: primary)),
+          const SizedBox(height: 10),
+          Text('نتيجتك مبنية على إجاباتك في الاختبار وتحليل Speaking بالذكاء الاصطناعي.', textAlign: TextAlign.center, style: ar(12.5, color: inkSoft).copyWith(height: 1.7)),
+        ]),
+      ),
+      const SizedBox(height: 14),
+      Row(children: [
+        _resultMetric('أسئلة أجبت عنها', '$answeredQuestions / 12'),
+        const SizedBox(width: 10),
+        _resultMetric('إجابات صحيحة', '$score / 12'),
+      ]),
+      const SizedBox(height: 10),
+      Row(children: [
+        _resultMetric('نسبة المعرفة', '$resultKnowledgeScore%'),
+        const SizedBox(width: 10),
+        _resultMetric('Speaking', spokenText.trim().isEmpty ? 'غير مكتمل' : 'مكتمل'),
+      ]),
+      const SizedBox(height: 16),
+      _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('ملخص الاختبار', style: ar(14, weight: FontWeight.w800)),
+        const SizedBox(height: 10),
+        Text('${speakingAnalysis['feedback'] ?? 'تحليل AI جاهز.'}', style: ar(12.5, color: inkSoft).copyWith(height: 1.7)),
+        const SizedBox(height: 8),
+        Text('تم احتساب النتيجة من Grammar وVocabulary وReading وListening، مع تحليل إجابة Speaking.', style: ar(11, color: inkFaint).copyWith(height: 1.6)),
+      ])),
+      const SizedBox(height: 18),
+      SizedBox(width: double.infinity, child: FilledButton(onPressed: widget.onComplete, style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: Text('ابدأ التعلم', style: ar(14, weight: FontWeight.w800, color: Colors.white)))),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (showResult) {
+      return Scaffold(backgroundColor: bg, body: _buildResultView());
+    }
     final isReading = section == 2;
     final isListening = section == 3;
     final isSpeaking = section == 4;
     final totalSections = 5;
     return Scaffold(backgroundColor: bg, appBar: AppBar(backgroundColor: bg, elevation: 0, title: Text('تحديد المستوى', style: ar(16, weight: FontWeight.w700))), body: ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 30), children: [
-      LinearProgressIndicator(value: (section + (question / 5)) / totalSections, backgroundColor: line, color: primary, minHeight: 6, borderRadius: BorderRadius.circular(6)),
-      const SizedBox(height: 24),
+      Row(children: List.generate(totalSections, (index) => Expanded(child: Container(margin: EdgeInsets.only(left: index == totalSections - 1 ? 0 : 4), height: 5, decoration: BoxDecoration(color: index <= section ? primary : line, borderRadius: BorderRadius.circular(5))))),
+      const SizedBox(height: 10),
+      Text('المرحلة ${section + 1} من $totalSections', textAlign: TextAlign.center, style: ar(11.5, color: inkFaint, weight: FontWeight.w600)),
+      const SizedBox(height: 18),
       Center(child: Text(isReading ? 'Reading' : isListening ? 'Listening' : isSpeaking ? 'Speaking ⭐' : section == 0 ? 'Grammar' : 'Vocabulary', style: en(18, weight: FontWeight.w800, color: primary))),
       const SizedBox(height: 14),
       if (section < 2) ...[
@@ -1046,7 +1107,7 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
           const SizedBox(height: 10),
           FilledButton.icon(onPressed: videoReady ? playListeningClip : null, icon: Icon(playingListening ? Icons.pause_rounded : Icons.play_arrow_rounded), label: Text(playingListening ? 'إيقاف الفيديو' : 'تشغيل الفيديو', style: ar(12, weight: FontWeight.w700)), style: FilledButton.styleFrom(backgroundColor: primaryTint, foregroundColor: primary)),
           const SizedBox(height: 10),
-          ...listeningOptions.map((item) => ListTile(contentPadding: EdgeInsets.zero, title: Text(item, style: en(13)), onTap: () { score += item == listeningOptions.first ? 1 : 0; setState(() => section++); })),
+          ...listeningOptions.map((item) => ListTile(contentPadding: EdgeInsets.zero, title: Text(item, style: en(13)), onTap: () { answeredQuestions++; score += item == listeningOptions.first ? 1 : 0; setState(() => section++); })),
         ])),
       ] else if (isSpeaking) ...[
         Text('تحدث لمدة 30–60 ثانية عن نفسك.', style: ar(14, weight: FontWeight.w700)), const SizedBox(height: 12), _Card(child: Column(children: [Text('Tell me about yourself.', textAlign: TextAlign.center, style: en(22, weight: FontWeight.w700, color: primary)), const SizedBox(height: 16), IconButton(onPressed: startSpeaking, icon: Icon(listening ? Icons.stop_circle : Icons.mic_rounded, color: listening ? rust : primary, size: 58)), if (spokenText.isNotEmpty) ...[
