@@ -151,7 +151,36 @@ class _VoiceScreenState extends State<VoiceScreen> {
   int exchanges = 0;
   int? conversationId;
   bool submittedCurrent = false;
+  bool openingPlayed = false;
   late final Map<String, String> sessionTopic = _conversationTopics[Random().nextInt(_conversationTopics.length)];
+
+  @override
+  void initState() {
+    super.initState();
+    _speakOpening();
+  }
+
+  Future<void> _speakOpening() async {
+    if (openingPlayed) return;
+    openingPlayed = true;
+    final opening = switch (sessionTopic['title']) {
+      'Daily life' => 'Hi! Let\'s talk about your day. What was the best part of it?',
+      'Travel' => 'Hi! Let\'s talk about travel. Where would you love to go next?',
+      'Work & goals' => 'Hi! Let\'s talk about your goals. What are you working toward right now?',
+      'Food & culture' => 'Hi! Let\'s talk about food. What is a dish you really enjoy?',
+      'Technology' => 'Hi! Let\'s talk about technology. What app do you use every day?',
+      _ => 'Hi! I\'m ready to practice English with you. Tell me something about your day.',
+    };
+    if (mounted) setState(() => status = 'المدرب يبدأ المحادثة...');
+    await tts.setLanguage('en-US');
+    await tts.setSpeechRate(0.45);
+    await tts.setVolume(1.0);
+    await tts.setPitch(1.0);
+    await tts.awaitSpeakCompletion(true);
+    if (!mounted) return;
+    await tts.speak(opening);
+    if (mounted && !listening && !sending) setState(() => status = 'اضغط للبدء بالحديث');
+  }
 
   @override
   void dispose() {
@@ -163,6 +192,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
 
   Future<void> toggleListening() async {
     if (sending) return;
+    await tts.stop();
     if (listening) {
       await speech.stop();
       if (mounted) setState(() { listening = false; status = 'جاري تحليل كلامك...'; });
@@ -171,16 +201,21 @@ class _VoiceScreenState extends State<VoiceScreen> {
     }
 
     final available = await speech.initialize(
+      debugLogging: false,
       onStatus: (value) {
         if (!mounted) return;
-        if (value == 'done' && listening) setState(() => listening = false);
+        if (value == 'done' || value == 'notListening') setState(() => listening = false);
       },
-      onError: (_) {
-        if (mounted) setState(() { listening = false; status = 'تعذر الوصول للميكروفون'; });
+      onError: (error) {
+        if (!mounted) return;
+        setState(() {
+          listening = false;
+          status = 'تعذر تشغيل المايك: ${error.errorMsg}';
+        });
       },
     );
     if (!available) {
-      if (mounted) setState(() => status = 'اسمح للتطبيق باستخدام الميكروفون');
+      if (mounted) setState(() => status = 'اسمح للمتصفح باستخدام الميكروفون من رمز القفل بجانب localhost ثم حاول مرة أخرى.');
       return;
     }
     setState(() {
@@ -197,6 +232,10 @@ class _VoiceScreenState extends State<VoiceScreen> {
     await speech.listen(
       localeId: 'en_US',
       listenMode: stt.ListenMode.dictation,
+      partialResults: true,
+      cancelOnError: true,
+      listenFor: const Duration(seconds: 60),
+      pauseFor: const Duration(seconds: 4),
       onResult: (result) {
         if (!mounted) return;
         setState(() => transcript = result.recognizedWords);
@@ -241,8 +280,13 @@ class _VoiceScreenState extends State<VoiceScreen> {
         await tts.stop();
         await tts.speak(result.reply);
       }
-    } catch (_) {
-      if (mounted) setState(() { sending = false; status = 'تعذر الاتصال بالخادم'; });
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          sending = false;
+          status = 'تعذر الاتصال بالـBackend على ${widget.api.baseUrl}. شغّل الخادم وتحقق من API_BASE_URL.';
+        });
+      }
     }
   }
 
@@ -596,6 +640,8 @@ class _ProfileContentState extends State<ProfileContent> {
       const SizedBox(height: 14),
       _Card(child: Column(children: [
         Row(children: [
+          Container(width: 64, height: 64, decoration: const BoxDecoration(color: primary, shape: BoxShape.circle), child: Center(child: Text(initial, style: ar(24, weight: FontWeight.w800, color: Colors.white)))),
+          const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(name, style: ar(19, weight: FontWeight.w800)),
             const SizedBox(height: 4),
@@ -603,8 +649,6 @@ class _ProfileContentState extends State<ProfileContent> {
             const SizedBox(height: 9),
             Container(padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5), decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(16)), child: Text(level, style: ar(11, weight: FontWeight.w700, color: primary))),
           ])),
-          Container(width: 64, height: 64, decoration: const BoxDecoration(color: primary, shape: BoxShape.circle), child: Center(child: Text(initial, style: ar(24, weight: FontWeight.w800, color: Colors.white)))),
-          const SizedBox(width: 10),
           IconButton(onPressed: _editProfile, tooltip: 'تعديل المعلومات', icon: const Icon(Icons.edit_outlined, color: inkSoft, size: 20)),
         ]),
       ])),
@@ -873,8 +917,13 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
     listeningOptions = aiChoosesSkill
         ? ['They are practicing ordering coffee.', 'They are discussing a flight cancellation.', 'They are watching a football match.']
         : ['They are practicing ordering coffee.', 'A butterfly is flying over the flowers.', 'The room is completely empty.'];
-    videoController = VideoPlayerController.asset('assets/hiwar-english-conversation.mp4')
-      ..initialize().then((_) { if (mounted) setState(() => videoReady = true); }).catchError((_) { if (mounted) setState(() => videoFailed = true); });
+    videoController = VideoPlayerController.asset('assets/hiwar-english-conversation.mp4');
+    videoController.setLooping(false);
+    videoController.initialize().then((_) {
+      if (mounted) setState(() => videoReady = true);
+    }).catchError((_) {
+      if (mounted) setState(() => videoFailed = true);
+    });
   }
 
   @override
@@ -896,11 +945,19 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
       return;
     }
     final ready = await speech.initialize(
-      onStatus: (status) { if (mounted && status == 'done') setState(() => listening = false); },
-      onError: (_) { if (mounted) setState(() => listening = false); },
+      debugLogging: false,
+      onStatus: (status) {
+        if (!mounted) return;
+        if (status == 'done' || status == 'notListening') setState(() => listening = false);
+      },
+      onError: (error) {
+        if (!mounted) return;
+        setState(() => listening = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تشغيل المايك: ${error.errorMsg}')));
+      },
     );
     if (!ready) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اسمح للمتصفح باستخدام الميكروفون ثم حاول مرة أخرى.')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اسمح للمتصفح باستخدام الميكروفون من رمز القفل بجانب localhost ثم حاول مرة أخرى.')));
       return;
     }
     if (mounted) setState(() { listening = true; showSpokenText = false; spokenText = ''; });
@@ -908,6 +965,9 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
       localeId: 'en_US',
       listenMode: stt.ListenMode.dictation,
       partialResults: true,
+      cancelOnError: true,
+      listenFor: const Duration(seconds: 60),
+      pauseFor: const Duration(seconds: 4),
       onResult: (result) {
         if (!mounted) return;
         setState(() => spokenText = result.recognizedWords);
