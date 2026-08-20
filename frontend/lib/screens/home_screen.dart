@@ -6,6 +6,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:video_player/video_player.dart';
+import '../features/progress/tutor_progress_content.dart';
+import '../features/reading/smart_reading_screen.dart';
+import '../features/speaking/smart_speaking_screen.dart';
 import '../services/hiwar_api.dart';
 
 const bg = Color(0xFFF6F3EF);
@@ -50,9 +53,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      HomeContent(profile: widget.profile, onVoice: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => VoiceScreen(api: _api)))),
-      ExploreContent(),
-      ProgressContent(profile: widget.profile, onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: widget.profile?.userId, focusSkills: widget.profile?.focusSkills, onComplete: () { _open(0); Navigator.of(context).pop(); })))),
+      HomeContent(profile: widget.profile, onVoice: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SmartSpeakingScreen(api: _api)))),
+      ExploreContent(api: _api, profile: widget.profile),
+      TutorProgressContent(api: _api, profile: widget.profile, onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: widget.profile?.userId, focusSkills: widget.profile?.focusSkills, onComplete: () { _open(0); Navigator.of(context).pop(); })))),
       ProfileContent(api: _api, profile: widget.profile),
     ];
     return Directionality(
@@ -116,10 +119,10 @@ class HomeContent extends StatelessWidget {
     _Card(child: Row(children: [ _Ring(value: '${profile?.levelScore ?? 0}%'), const SizedBox(width: 16), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(displayLevel, style: ar(14.5, weight: FontWeight.w700)), Text(hasAssessedLevel ? 'نتيجتك من اختبار تحديد المستوى' : 'أكمل اختبار تحديد المستوى أولًا', style: ar(12, color: inkFaint)), const SizedBox(height: 5), Text(hasAssessedLevel ? '${profile?.levelScore ?? 0} نقطة مستوى' : 'لا توجد نتيجة بعد', style: mono(11.5, weight: FontWeight.w600, color: primary))])])),
     const SizedBox(height: 26),
     Column(children: [GestureDetector(onTap: onVoice, child: Container(width: 132, height: 132, decoration: const BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(center: Alignment(-.35, -.5), colors: [Color(0xFF6459A8), primary])), child: const Icon(Icons.mic_none, size: 44, color: Colors.white))), const SizedBox(height: 16), Text('ابدأ محادثة صوتية', style: ar(15.5, weight: FontWeight.w700)), const SizedBox(height: 3), Text('تحدّث بحرية، الذكاء الاصطناعي يستمع ويرد عليك', style: ar(12, color: inkFaint))]),
-    _SectionTitle('مقترح اليوم', tag: 'مبني على أدائك'),
-    _Card(onTap: onVoice, child: Row(children: [Container(width: 46, height: 46, decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.menu_book_outlined, color: primary)), const SizedBox(width: 14), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('التحدث في المطعم', style: ar(14, weight: FontWeight.w700)), Text('Ordering food at a restaurant', style: en(12.5, color: inkFaint))]), const Spacer(), Text('‹', style: ar(28, color: inkFaint))])),
+    const _SectionTitle('مقترح اليوم', tag: 'جلسة قصيرة'),
+    _Card(onTap: onVoice, child: Row(children: [Container(width: 46, height: 46, decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.record_voice_over_outlined, color: primary)), const SizedBox(width: 14), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('محادثة تناسب مستواك وهدفك', style: ar(14, weight: FontWeight.w700)), Text('Your coach will choose the right topic', style: en(12.5, color: inkFaint))])), Text('‹', style: ar(28, color: inkFaint))])),
     const _SectionTitle('أخطاء تحتاج مراجعة'),
-    SizedBox(height: 78, child: ListView(scrollDirection: Axis.horizontal, children: const [_MistakeChip(wrong: 'I have went there', correct: 'I have gone there', category: 'الأزمنة — Present Perfect'), SizedBox(width: 10), _MistakeChip(wrong: 'since three years', correct: 'for three years', category: 'since / for'), SizedBox(width: 10), _MistakeChip(wrong: 'think / think', correct: '/θɪŋk/', category: 'نطق حرف th')])),
+    _Card(child: Row(children: [const Icon(Icons.fact_check_outlined, color: primary), const SizedBox(width: 12), Expanded(child: Text('ستظهر هنا الأخطاء المؤكدة بعد جلساتك ومحاولات الإعادة، بدون افتراضات مسبقة.', style: ar(12.5, color: inkSoft).copyWith(height: 1.6)))])),
     ]);
   }
 }
@@ -453,29 +456,43 @@ class _WordChip extends StatelessWidget {
 }
 
 class ExploreContent extends StatelessWidget {
+  final HiwarApi api;
+  final HiwarProfile? profile;
+
+  const ExploreContent({super.key, required this.api, this.profile});
+
   @override
   Widget build(BuildContext context) => ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 28), children: [
     const _SectionTitle('استكشف'),
     Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(gradient: const LinearGradient(colors: [primaryDark, primary]), borderRadius: BorderRadius.circular(18)), child: Row(children: [
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('✦ اقتراح ذكي لك', style: ar(11, weight: FontWeight.w700, color: Colors.white)), const SizedBox(height: 8), Text('بناءً على محادثاتك الأخيرة، ركّزي هالأسبوع على Present Perfect ونطق حرف th — قبل ما ننتقل لمهارة جديدة.', style: ar(13, color: Colors.white).copyWith(height: 1.6))])),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('✦ معلمك يتكيف معك', style: ar(11, weight: FontWeight.w700, color: Colors.white)), const SizedBox(height: 8), Text('ابدأ جلسة Speaking أو Reading. بعد جمع أدلة كافية، سيحدد المعلم ما تحتاج مراجعته فعلاً.', style: ar(13, color: Colors.white).copyWith(height: 1.6))])),
       const SizedBox(width: 8),
       _SparkleArt(),
     ])),
     const SizedBox(height: 16),
-    GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1.05, children: [_Skill(title: 'التحدث', english: 'Speaking', value: 70, color: primaryTint), _Skill(title: 'الاستماع', english: 'Listening', value: 55, color: const Color(0xFFE7EEF7)), _Skill(title: 'القراءة', english: 'Reading', value: 48, color: const Color(0xFFF7EEDB)), _Skill(title: 'الكتابة', english: 'Writing', value: 40, color: const Color(0xFFF6E6EB)), _Skill(title: 'القواعد', english: 'Grammar', value: 58, color: const Color(0xFFE9E7F2)), _Skill(title: 'المفردات', english: 'Vocabulary', value: 65, color: const Color(0xFFF8E7E6))],),
+    GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1.05, children: [
+      _Skill(title: 'التحدث', english: 'Speaking', color: primaryTint, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SmartSpeakingScreen(api: api)))),
+      const _Skill(title: 'الاستماع', english: 'Listening', color: Color(0xFFE7EEF7)),
+      _Skill(title: 'القراءة', english: 'Reading', color: const Color(0xFFF7EEDB), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SmartReadingScreen(api: api, level: profile?.level)))),
+      const _Skill(title: 'الكتابة', english: 'Writing', color: Color(0xFFF6E6EB)),
+      const _Skill(title: 'القواعد', english: 'Grammar', color: Color(0xFFE9E7F2)),
+      const _Skill(title: 'المفردات', english: 'Vocabulary', color: Color(0xFFF8E7E6)),
+    ]),
   ]);
 }
 class _Skill extends StatelessWidget {
   final String title;
   final String english;
-  final int value;
+  final int? value;
   final Color color;
+  final VoidCallback? onTap;
 
-  const _Skill({required this.title, required this.english, required this.value, required this.color});
+  const _Skill({required this.title, required this.english, this.value, required this.color, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return _Card(
+      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -484,9 +501,12 @@ class _Skill extends StatelessWidget {
           Text(title, style: ar(13.5, weight: FontWeight.w700)),
           Text(english, style: en(11, color: inkFaint)),
           const Spacer(),
-          ClipRRect(borderRadius: BorderRadius.circular(5), child: LinearProgressIndicator(value: value / 100, minHeight: 5, backgroundColor: line, color: primary)),
-          const SizedBox(height: 5),
-          Text('$value%', style: mono(10.5, color: inkFaint)),
+          if (value != null) ...[
+            ClipRRect(borderRadius: BorderRadius.circular(5), child: LinearProgressIndicator(value: value! / 100, minHeight: 5, backgroundColor: line, color: primary)),
+            const SizedBox(height: 5),
+            Text('$value%', style: mono(10.5, color: inkFaint)),
+          ] else
+            Text(onTap == null ? 'قريبًا' : 'ابدأ الآن', style: ar(10.5, weight: FontWeight.w600, color: onTap == null ? inkFaint : primary)),
         ],
       ),
     );

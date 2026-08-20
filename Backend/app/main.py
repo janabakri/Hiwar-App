@@ -8,8 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from .core.config import settings
 from .core.database import engine, Base
 from .core.migrations import ensure_user_profile_columns
-from .api.v1 import chat, profile, assessment
-from .models import conversation  # noqa: F401  # register ConversationTurn before create_all
+from .api.v1 import assessment, chat, learning_plan, profile, reading, speaking
+from . import models  # noqa: F401  # register every table before create_all
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -35,6 +35,9 @@ app.add_middleware(
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(profile.router, prefix="/api/v1", tags=["profile"])
 app.include_router(assessment.router, prefix="/api/v1", tags=["assessment"])
+app.include_router(speaking.router, prefix="/api/v1", tags=["speaking-agent"])
+app.include_router(reading.router, prefix="/api/v1", tags=["reading-agent"])
+app.include_router(learning_plan.router, prefix="/api/v1", tags=["learning-plan"])
 
 # Root endpoints
 @app.get("/")

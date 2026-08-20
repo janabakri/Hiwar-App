@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../features/tutor/tutor_models.dart';
 
 class HiwarStats {
   final String userId;
@@ -221,6 +222,68 @@ class HiwarApi {
       if (conversationId != null) 'conversation_id': conversationId,
     });
     return HiwarChatResult.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<SpeakingSessionData> startTutorSpeaking({String mode = 'conversation', String? topic, String? goal}) async {
+    final response = await _dio.post('/api/v1/speaking/sessions', data: {
+      'mode': mode,
+      'topic': topic,
+      'goal': goal,
+    });
+    return SpeakingSessionData.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<SpeakingTurnData> submitTutorSpeakingTurn({required String sessionId, required String transcript}) async {
+    final response = await _dio.post(
+      '/api/v1/speaking/sessions/${Uri.encodeComponent(sessionId)}/turns',
+      data: {'transcript': transcript},
+    );
+    return SpeakingTurnData.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<SpeakingRetryData> retryTutorSpeakingTurn({required String turnId, required String transcript}) async {
+    final response = await _dio.post(
+      '/api/v1/speaking/turns/${Uri.encodeComponent(turnId)}/retry',
+      data: {'transcript': transcript},
+    );
+    return SpeakingRetryData.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<SpeakingSummaryData> finishTutorSpeaking(String sessionId) async {
+    final response = await _dio.post('/api/v1/speaking/sessions/${Uri.encodeComponent(sessionId)}/finish');
+    return SpeakingSummaryData.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<ReadingSessionData> startTutorReading({String? level, String? topic, String? sourceText}) async {
+    final response = await _dio.post('/api/v1/reading/sessions', data: {
+      'level': level,
+      'topic': topic,
+      'source_text': sourceText,
+    });
+    return ReadingSessionData.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<ReadingAnswerData> submitTutorReadingAnswer({required String sessionId, required String questionId, required String answer}) async {
+    final response = await _dio.post(
+      '/api/v1/reading/sessions/${Uri.encodeComponent(sessionId)}/answers',
+      data: {'question_id': questionId, 'answer': answer},
+    );
+    return ReadingAnswerData.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<ReadingSummaryData> finishTutorReading(String sessionId) async {
+    final response = await _dio.post('/api/v1/reading/sessions/${Uri.encodeComponent(sessionId)}/finish');
+    return ReadingSummaryData.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<TutorProgressData> getTutorProgress() async {
+    final response = await _dio.get('/api/v1/progress');
+    return TutorProgressData.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<TodayLearningPlanData> getTodayLearningPlan() async {
+    final response = await _dio.get('/api/v1/learning-plan/today');
+    return TodayLearningPlanData.fromJson(Map<String, dynamic>.from(response.data as Map));
   }
 
   Future<HiwarProfile> getProfile(String userId) async {

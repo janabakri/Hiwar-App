@@ -46,19 +46,25 @@ class Settings:
     # App
     APP_NAME: str = os.getenv("APP_NAME", "Hiwar App")
     APP_VERSION: str = os.getenv("APP_VERSION", "1.0.0")
+    APP_ENV: str = os.getenv("APP_ENV", "development")
     DEBUG: bool = os.getenv("DEBUG", "False").lower() in {"1", "true", "yes", "on"}
 
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./app.db")
+    REDIS_URL: str = os.getenv("REDIS_URL", "")
 
     # AI Provider
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY", "")
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    AI_TUTOR_MODEL: str = os.getenv("AI_TUTOR_MODEL", OPENAI_MODEL)
+    AI_TUTOR_MAX_TOKENS: int = int(os.getenv("AI_TUTOR_MAX_TOKENS", "900"))
+    AI_TUTOR_TIMEOUT_SECONDS: float = float(os.getenv("AI_TUTOR_TIMEOUT_SECONDS", "20"))
 
     # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")
+    JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
     APPLE_CLIENT_ID: str = os.getenv("APPLE_CLIENT_ID", "")
 
@@ -69,6 +75,12 @@ class Settings:
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
     SMTP_FROM: str = os.getenv("SMTP_FROM", "")
     SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "حوار App")
+
+    # Tutor memory and privacy. Audio retention stays disabled unless a future
+    # explicit-consent flow enables it.
+    MEMORY_MIN_CONFIDENCE: float = float(os.getenv("MEMORY_MIN_CONFIDENCE", "0.86"))
+    MEMORY_REPEAT_THRESHOLD: int = int(os.getenv("MEMORY_REPEAT_THRESHOLD", "2"))
+    AUDIO_RETENTION_ENABLED: bool = os.getenv("AUDIO_RETENTION_ENABLED", "False").lower() in {"1", "true", "yes", "on"}
 
 
 settings = Settings()
