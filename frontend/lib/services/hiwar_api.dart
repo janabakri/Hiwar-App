@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class HiwarStats {
   final String userId;
@@ -87,7 +88,8 @@ class HiwarError {
   final String explanation;
   final String errorType;
   final int count;
-  const HiwarError({this.id, required this.wrong, required this.correct, required this.explanation, required this.errorType, required this.count});
+  final DateTime? lastOccurrence;
+  const HiwarError({this.id, required this.wrong, required this.correct, required this.explanation, required this.errorType, required this.count, this.lastOccurrence});
   factory HiwarError.fromJson(Map<String, dynamic> json) => HiwarError(
     id: (json['id'] as num?)?.toInt(),
     wrong: '${json['wrong'] ?? json['wrong_text'] ?? ''}',
@@ -95,6 +97,7 @@ class HiwarError {
     explanation: '${json['explanation'] ?? ''}',
     errorType: '${json['error_type'] ?? 'general'}',
     count: (json['count'] as num?)?.toInt() ?? 1,
+    lastOccurrence: DateTime.tryParse('${json['last_occurrence'] ?? ''}'),
   );
 }
 
@@ -145,6 +148,7 @@ class HiwarApi {
   }
 
   final Dio _dio;
+  static const _secureStorage = FlutterSecureStorage();
 
   static String _apiBaseUrl() {
     final configured = dotenv.isInitialized ? dotenv.env['API_BASE_URL'] : null;
@@ -164,13 +168,17 @@ class HiwarApi {
   }
 
   Future<void> saveAccessToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('hiwar_access_token', token);
+    await _secureStorage.write(key: 'hiwar_access_token', value: token);
   }
 
   Future<String?> getAccessToken() async {
+    return _secureStorage.read(key: 'hiwar_access_token');
+  }
+
+  Future<void> signOut() async {
+    await _secureStorage.delete(key: 'hiwar_access_token');
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('hiwar_access_token');
+    await prefs.remove('hiwar_user_id');
   }
 
   Future<Map<String, dynamic>> signUp({required String name, required String email, required String password}) async {
