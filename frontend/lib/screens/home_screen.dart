@@ -417,6 +417,15 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     final seconds = widget.duration % 60;
     final current = widget.corrections.map((item) => HiwarError(wrong: item['wrong'] ?? '', correct: item['correct'] ?? '', explanation: item['explanation'] ?? '', errorType: 'session', count: 1)).toList();
     final all = [...current, ...historical];
+    final now = DateTime.now();
+    final quizErrors = [...all]
+      ..removeWhere((item) {
+        final date = item.lastOccurrence;
+        final outsideMonth = date != null && (date.year != now.year || date.month != now.month);
+        return item.wrong.trim().isEmpty || item.correct.trim().isEmpty || outsideMonth;
+      })
+      ..sort((a, b) => b.count.compareTo(a.count));
+    final quizItems = quizErrors.take(3).toList();
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(backgroundColor: bg, elevation: 0, title: Text('مراجعة المحادثة', style: ar(16, weight: FontWeight.w700))),
@@ -434,6 +443,13 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
           ...all.asMap().entries.map((entry) => _ReviewCard(number: '${entry.key + 1}', wrong: entry.value.wrong, correct: entry.value.correct, explain: '${entry.value.explanation}${entry.value.count > 1 ? ' · تكررت ${entry.value.count} مرات' : ''}')),
         ],
         if (!loading && all.isEmpty) _Card(child: Text('استمر بالتحدث. سيظهر هنا سجل ملاحظاتك بعد أول تحليل حقيقي.', textAlign: TextAlign.center, style: ar(13, color: inkSoft).copyWith(height: 1.7))),
+        if (!loading && quizItems.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _PersonalizedPracticeCard(
+            errors: quizItems,
+            onStart: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PersonalizedErrorQuizScreen(errors: quizItems))),
+          ),
+        ],
         const SizedBox(height: 22),
         FilledButton.icon(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.bolt), label: Text('العودة للمحادثة', style: ar(14, weight: FontWeight.w700)), style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.all(16))),
       ]),
@@ -1195,5 +1211,146 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
         const SizedBox(height: 18), FilledButton(onPressed: analyzing || spokenText.trim().isEmpty ? null : finish, style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.all(16)), child: Text(analyzing ? 'جارٍ تحليل إجابتك...' : 'حلّل مستواي بالـAI', style: ar(14, weight: FontWeight.w700, color: Colors.white))),
       ] else ...[],
     ]));
+  }
+}
+
+
+class _PersonalizedPracticeCard extends StatelessWidget {
+  final List<HiwarError> errors;
+  final VoidCallback onStart;
+
+  const _PersonalizedPracticeCard({required this.errors, required this.onStart});
+
+  @override
+  Widget build(BuildContext context) {
+    final top = errors.first;
+    return _Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(width: 42, height: 42, decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.auto_awesome, color: primary)),
+              const SizedBox(width: 10),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('مبني على أخطائك المتكررة', style: ar(14, weight: FontWeight.w800)),
+                const SizedBox(height: 3),
+                Text('تمرين مخصص لك', style: ar(12, color: inkFaint)),
+              ])),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text('${errors.length} ${errors.length == 1 ? 'سؤال اختاره' : 'أسئلة اختارها'} لك النظام من أكثر أخطائك تكرارًا هذا الشهر.', style: ar(12.5, color: inkSoft).copyWith(height: 1.6)),
+          const SizedBox(height: 8),
+          Text('من: ${_practiceTypeLabel(top.errorType)} ×${top.count}', style: ar(11.5, color: primary, weight: FontWeight.w700)),
+          const SizedBox(height: 12),
+          FilledButton.icon(onPressed: onStart, icon: const Icon(Icons.play_arrow_rounded), label: Text('ابدأ التمرين', style: ar(12.5, weight: FontWeight.w700)), style: FilledButton.styleFrom(backgroundColor: primary, minimumSize: const Size.fromHeight(44))),
+        ],
+      ),
+    );
+  }
+}
+
+String _practiceTypeLabel(String type) {
+  switch (type.toLowerCase()) {
+    case 'grammar':
+      return 'Grammar';
+    case 'vocabulary':
+      return 'Vocabulary';
+    case 'pronunciation':
+      return 'Pronunciation';
+    case 'sentence_structure':
+      return 'Sentence structure';
+    case 'naturalness':
+      return 'Naturalness';
+    default:
+      return type.isEmpty ? 'ملاحظة من المحادثة' : type;
+  }
+}
+
+class PersonalizedErrorQuizScreen extends StatefulWidget {
+  final List<HiwarError> errors;
+
+  const PersonalizedErrorQuizScreen({super.key, required this.errors});
+
+  @override
+  State<PersonalizedErrorQuizScreen> createState() => _PersonalizedErrorQuizScreenState();
+}
+
+class _PersonalizedErrorQuizScreenState extends State<PersonalizedErrorQuizScreen> {
+  int index = 0;
+  int correctAnswers = 0;
+  String? selected;
+
+  HiwarError get current => widget.errors[index];
+
+  List<String> get options {
+    final values = <String>[current.correct, current.wrong];
+    if (values[0].trim() == values[1].trim()) values[1] = '${current.wrong} (كما قلتها سابقًا)';
+    return values;
+  }
+
+  void answer(String value) {
+    if (selected != null) return;
+    final isCorrect = value == current.correct;
+    setState(() {
+      selected = value;
+      if (isCorrect) correctAnswers++;
+    });
+  }
+
+  void next() {
+    if (index == widget.errors.length - 1) {
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AlertDialog(
+          title: Text('خلصت التمرين', style: ar(17, weight: FontWeight.w800)),
+          content: Text('أجبت صح على $correctAnswers من ${widget.errors.length} أسئلة.', style: ar(14, color: inkSoft)),
+          actions: [TextButton(onPressed: () { Navigator.pop(context); Navigator.pop(context); }, child: Text('تم', style: ar(13, color: primary, weight: FontWeight.w700)))],
+        ),
+      );
+      return;
+    }
+    setState(() { index++; selected = null; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final item = current;
+    final answered = selected != null;
+    return Scaffold(
+      backgroundColor: bg,
+      appBar: AppBar(backgroundColor: bg, elevation: 0, title: Text('تمرين مخصص لك', style: ar(16, weight: FontWeight.w800))),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+        children: [
+          Row(children: List.generate(widget.errors.length, (i) => Expanded(child: Container(margin: EdgeInsets.only(left: i == widget.errors.length - 1 ? 0 : 5), height: 6, decoration: BoxDecoration(color: i <= index ? primary : line, borderRadius: BorderRadius.circular(6)))))),
+          const SizedBox(height: 22),
+          Text('السؤال ${index + 1} من ${widget.errors.length}', style: ar(12, color: inkFaint)),
+          const SizedBox(height: 10),
+          _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('من: ${_practiceTypeLabel(item.errorType)} ×${item.count}', style: ar(12, color: primary, weight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            Text('اختر التصحيح الصحيح للجملة أو العبارة:', style: ar(14, weight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            Text('"${item.wrong}"', style: en(18, color: inkSoft).copyWith(fontStyle: FontStyle.italic)),
+          ])),
+          const SizedBox(height: 14),
+          ...options.map((option) {
+            final isSelected = selected == option;
+            final isCorrect = option == item.correct;
+            final color = !answered ? line : isCorrect ? const Color(0xFFBFE8D1) : isSelected ? const Color(0xFFF4C3C0) : line;
+            return Padding(padding: const EdgeInsets.only(bottom: 10), child: OutlinedButton(onPressed: answered ? null : () => answer(option), style: OutlinedButton.styleFrom(backgroundColor: color, padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15), side: BorderSide(color: isSelected || (answered && isCorrect) ? primary : line)), child: Align(alignment: Alignment.centerRight, child: Text(option, style: en(14, color: ink)))));
+          }),
+          if (answered) ...[
+            const SizedBox(height: 4),
+            _Card(child: Text(selected == item.correct ? 'صح! ${item.explanation.isEmpty ? 'ممتاز، استمر على هذا الاستخدام.' : item.explanation}' : 'راجعها مرة ثانية: ${item.explanation.isEmpty ? 'حاول استخدام الصياغة الصحيحة في محادثتك القادمة.' : item.explanation}', style: ar(13, color: inkSoft).copyWith(height: 1.7))),
+            const SizedBox(height: 14),
+            FilledButton(onPressed: next, style: FilledButton.styleFrom(backgroundColor: primary, minimumSize: const Size.fromHeight(48)), child: Text(index == widget.errors.length - 1 ? 'إنهاء التمرين' : 'السؤال التالي', style: ar(13.5, weight: FontWeight.w700, color: Colors.white))),
+          ],
+        ],
+      ),
+    );
   }
 }
