@@ -107,8 +107,10 @@ class HiwarChatResult {
   final List<String> tips;
   final int? conversationId;
   final int? messageId;
+  final bool analysisCompleted;
+  final String? analysisMessage;
 
-  const HiwarChatResult({required this.reply, required this.corrections, required this.tips, this.conversationId, this.messageId});
+  const HiwarChatResult({required this.reply, required this.corrections, required this.tips, this.conversationId, this.messageId, this.analysisCompleted = false, this.analysisMessage});
 
   factory HiwarChatResult.fromJson(Map<String, dynamic> json) {
     final rawCorrections = (json['corrections'] as List?) ?? const [];
@@ -125,6 +127,8 @@ class HiwarChatResult {
       tips: ((json['tips'] as List?) ?? const []).map((tip) => '$tip').toList(),
       conversationId: (json['conversation_id'] as num?)?.toInt(),
       messageId: (json['message_id'] as num?)?.toInt(),
+      analysisCompleted: json['analysis_completed'] == true,
+      analysisMessage: json['analysis_message']?.toString(),
     );
   }
 }
