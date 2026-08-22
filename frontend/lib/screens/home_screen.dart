@@ -148,6 +148,8 @@ class _VoiceScreenState extends State<VoiceScreen> {
   final List<Map<String, String>> corrections = [];
   String reply = '';
   List<String> tips = const [];
+  String? analysisError;
+  bool analysisCompleted = false;
   int exchanges = 0;
   int? conversationId;
   bool submittedCurrent = false;
@@ -266,10 +268,12 @@ class _VoiceScreenState extends State<VoiceScreen> {
           ..clear()
           ..addAll(result.corrections);
         tips = result.tips;
+        analysisCompleted = result.analysisCompleted;
+        analysisError = result.analysisMessage;
         exchanges++;
         sending = false;
         active = true;
-        status = 'يتحدث الآن...';
+        status = result.analysisCompleted ? 'يتحدث الآن...' : 'تم حفظ كلامك دون اكتمال التحليل';
       });
       await tts.setLanguage('en-US');
       await tts.setSpeechRate(0.45);
@@ -284,7 +288,10 @@ class _VoiceScreenState extends State<VoiceScreen> {
       if (mounted) {
         setState(() {
           sending = false;
-          status = 'تعذر الاتصال بالـBackend على ${widget.api.baseUrl}. شغّل الخادم وتحقق من API_BASE_URL.';
+          submittedCurrent = false;
+          analysisCompleted = false;
+          analysisError = 'تعذر الوصول إلى Backend على ${widget.api.baseUrl}. شغّل الخادم وتحقق من API_BASE_URL ثم حاول مرة أخرى.';
+          status = analysisError!;
         });
       }
     }
@@ -304,6 +311,9 @@ class _VoiceScreenState extends State<VoiceScreen> {
           tips: tips,
           duration: seconds,
           exchanges: exchanges,
+          topic: sessionTopic['title'] ?? 'محادثة إنجليزية',
+          analysisCompleted: analysisCompleted,
+          analysisMessage: analysisError,
         ),
       ),
     );
@@ -388,7 +398,10 @@ class FeedbackScreen extends StatefulWidget {
   final List<String> tips;
   final int duration;
   final int exchanges;
-  const FeedbackScreen({super.key, required this.api, this.corrections = const [], this.reply = '', this.tips = const [], this.duration = 0, this.exchanges = 0});
+  final String topic;
+  final bool analysisCompleted;
+  final String? analysisMessage;
+  const FeedbackScreen({super.key, required this.api, this.corrections = const [], this.reply = '', this.tips = const [], this.duration = 0, this.exchanges = 0, this.topic = 'محادثة إنجليزية', this.analysisCompleted = false, this.analysisMessage});
   @override
   State<FeedbackScreen> createState() => _FeedbackScreenState();
 }
@@ -432,17 +445,18 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
       body: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 30), children: [
         const _FeedbackCelebration(),
         Center(child: Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6), decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(20)), child: Text('✓ انتهت المحادثة', style: ar(12, weight: FontWeight.w700, color: primaryDark)))),
-        Center(child: Padding(padding: const EdgeInsets.only(top: 12), child: Text(all.isEmpty ? 'ممتاز، ما فيه ملاحظات هالمرة' : 'أداء جيد اليوم', style: ar(18, weight: FontWeight.w700)))),
-        Center(child: Text('${minutes}د ${seconds}ث · ${widget.exchanges} تبادلات · Ordering food at a restaurant', style: ar(12.5, color: inkFaint))),
+        Center(child: Padding(padding: const EdgeInsets.only(top: 12), child: Text(!widget.analysisCompleted ? 'لم يكتمل تحليل الجلسة' : all.isEmpty ? 'لم تظهر أخطاء واضحة' : 'أداء جيد اليوم', style: ar(18, weight: FontWeight.w700)))),
+        Center(child: Text('${minutes}د ${seconds}ث · ${widget.exchanges} تبادلات · ${widget.topic}', style: ar(12.5, color: inkFaint))),
         if (widget.reply.isNotEmpty) ...[const _SectionTitle('رد المساعد'), _Card(child: Text(widget.reply, style: ar(13, color: inkSoft).copyWith(height: 1.7)))],
         if (widget.tips.isNotEmpty) ...[const _SectionTitle('نصيحة لك'), _Card(child: Text(widget.tips.join('\n'), style: ar(13, color: inkSoft).copyWith(height: 1.7)))],
         if (loading) const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator(color: primary))),
         if (error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(error!, textAlign: TextAlign.center, style: ar(12, color: rust))),
-        if (!loading && all.isNotEmpty) ...[
-          _SectionTitle('الأخطاء والملاحظات السابقة (${historical.length})'),
+        if (!widget.analysisCompleted) _Card(child: Text(widget.analysisMessage ?? 'لم يصل تحليل حقيقي لهذه الجلسة. شغّل Backend ومزود AI ثم أعد المحاولة.', textAlign: TextAlign.center, style: ar(13, color: inkSoft).copyWith(height: 1.7))),
+        if (!loading && widget.analysisCompleted && all.isNotEmpty) ...[
+          _SectionTitle('الأخطاء التي تحتاج مراجعة (${historical.length})'),
           ...all.asMap().entries.map((entry) => _ReviewCard(number: '${entry.key + 1}', wrong: entry.value.wrong, correct: entry.value.correct, explain: '${entry.value.explanation}${entry.value.count > 1 ? ' · تكررت ${entry.value.count} مرات' : ''}')),
         ],
-        if (!loading && all.isEmpty) _Card(child: Text('استمر بالتحدث. سيظهر هنا سجل ملاحظاتك بعد أول تحليل حقيقي.', textAlign: TextAlign.center, style: ar(13, color: inkSoft).copyWith(height: 1.7))),
+        if (!loading && widget.analysisCompleted && all.isEmpty) _Card(child: Text('ممتاز. لم تظهر أخطاء واضحة في هذه الجلسة، وسيظهر أي خطأ حقيقي هنا بعد تحليله.', textAlign: TextAlign.center, style: ar(13, color: inkSoft).copyWith(height: 1.7))),
         if (!loading && quizItems.isNotEmpty) ...[
           const SizedBox(height: 12),
           _PersonalizedPracticeCard(
@@ -605,42 +619,18 @@ class _ProfileContentState extends State<ProfileContent> {
 
   String _value(String? value) => value == null || value.trim().isEmpty ? 'غير محدد' : value;
 
+  TableRow _profileTableRow(String label, String? value) => TableRow(children: [
+    Padding(padding: const EdgeInsets.symmetric(vertical: 9), child: Text(label, style: ar(12, color: inkFaint))),
+    Padding(padding: const EdgeInsets.symmetric(vertical: 9), child: Text(_value(value), style: ar(12.5, weight: FontWeight.w600, color: inkSoft))),
+  ]);
+
   Future<void> _editProfile() async {
     final current = editedProfile ?? widget.profile;
     if (current == null) return;
-    final name = TextEditingController(text: current.name);
-    final age = TextEditingController(text: current.age?.toString() ?? '');
-    final certificates = TextEditingController(text: current.certificates ?? '');
-    String education = current.educationLevel ?? 'متوسط';
-    final updated = await showDialog<HiwarProfile>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text('تعديل معلوماتي', style: ar(17, weight: FontWeight.w800)),
-          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(controller: name, decoration: const InputDecoration(labelText: 'الاسم')),
-            TextField(controller: age, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'العمر')),
-            DropdownButtonFormField<String>(value: education, decoration: const InputDecoration(labelText: 'المرحلة الدراسية'), items: const ['مبتدئ', 'متوسط', 'متقدم'].map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(), onChanged: (value) { if (value != null) setDialogState(() => education = value); }),
-            TextField(controller: certificates, decoration: const InputDecoration(labelText: 'الشهادات (اختياري)')),
-          ])),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text('إلغاء', style: ar(13, color: inkFaint))),
-            FilledButton(onPressed: () async {
-              if (name.text.trim().isEmpty) return;
-              try {
-                final result = await widget.api.updateProfile(userId: current.userId, name: name.text.trim(), age: int.tryParse(age.text.trim()), educationLevel: education, certificates: certificates.text.trim());
-                if (dialogContext.mounted) Navigator.pop(dialogContext, result);
-              } catch (_) {
-                if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(const SnackBar(content: Text('تعذر حفظ معلوماتك، حاول مرة أخرى.')));
-              }
-            }, child: Text('حفظ', style: ar(13, weight: FontWeight.w700, color: Colors.white))),
-          ],
-        ),
-      ),
+    final updated = await Navigator.push<HiwarProfile>(
+      context,
+      MaterialPageRoute(builder: (_) => ProfileEditScreen(api: widget.api, profile: current)),
     );
-    name.dispose();
-    age.dispose();
-    certificates.dispose();
     if (updated != null && mounted) setState(() => editedProfile = updated);
   }
 
@@ -692,16 +682,125 @@ class _ProfileContentState extends State<ProfileContent> {
         _TrainingRow(icon: Icons.notifications_none_rounded, title: 'تذكير المحادثة اليومية', value: reminderEnabled ? 'مفعّل' : 'متوقف', trailing: Switch(value: reminderEnabled, onChanged: (value) => setState(() => reminderEnabled = value)), onTap: () => setState(() => reminderEnabled = !reminderEnabled)),
       ])),
       const _SectionTitle('معلوماتي الشخصية'),
-      _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _InfoRow(label: 'العمر', value: profile?.age?.toString()),
-        _InfoRow(label: 'المرحلة الدراسية', value: profile?.educationLevel),
-        _InfoRow(label: 'أهداف التعلم', value: profile?.learningReason),
-        _InfoRow(label: 'المهارات المطلوبة', value: profile?.focusSkills),
-        _InfoRow(label: 'الشهادات', value: profile?.certificates),
-      ])),
+      _Card(child: Table(
+        columnWidths: const {0: FixedColumnWidth(116)},
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+        children: [
+          _profileTableRow('العمر', profile?.age?.toString()),
+          _profileTableRow('المرحلة الدراسية', profile?.educationLevel),
+          _profileTableRow('أهداف التعلم', profile?.learningReason),
+          _profileTableRow('المهارات المطلوبة', profile?.focusSkills),
+          _profileTableRow('الشهادات', profile?.certificates),
+        ],
+      )),
       if (loading) const Padding(padding: EdgeInsets.only(top: 16), child: Center(child: CircularProgressIndicator(color: primary))),
       if (!loading && error != null) Padding(padding: const EdgeInsets.only(top: 16), child: Text('تعذر تحميل الإحصاءات: $error', style: ar(11, color: rust))),
     ]);
+  }
+}
+
+class ProfileEditScreen extends StatefulWidget {
+  final HiwarApi api;
+  final HiwarProfile profile;
+  const ProfileEditScreen({super.key, required this.api, required this.profile});
+
+  @override
+  State<ProfileEditScreen> createState() => _ProfileEditScreenState();
+}
+
+class _ProfileEditScreenState extends State<ProfileEditScreen> {
+  late final TextEditingController name;
+  late final TextEditingController age;
+  late final TextEditingController learningReason;
+  late final TextEditingController focusSkills;
+  late final TextEditingController certificates;
+  late final TextEditingController dailyMinutes;
+  late String education;
+  bool saving = false;
+
+  static const levels = ['مبتدئ', 'أساسي', 'متوسط', 'متقدم'];
+
+  @override
+  void initState() {
+    super.initState();
+    final profile = widget.profile;
+    name = TextEditingController(text: profile.name);
+    age = TextEditingController(text: profile.age?.toString() ?? '');
+    learningReason = TextEditingController(text: profile.learningReason ?? '');
+    focusSkills = TextEditingController(text: profile.focusSkills ?? '');
+    certificates = TextEditingController(text: profile.certificates ?? '');
+    dailyMinutes = TextEditingController(text: profile.dailyMinutes?.toString() ?? '');
+    education = levels.contains(profile.educationLevel) ? profile.educationLevel! : 'متوسط';
+  }
+
+  String? _optional(String value) => value.trim().isEmpty ? null : value.trim();
+
+  Future<void> _save() async {
+    if (name.text.trim().isEmpty || saving) return;
+    setState(() => saving = true);
+    try {
+      final updated = await widget.api.updateProfile(
+        userId: widget.profile.userId,
+        name: name.text.trim(),
+        age: int.tryParse(age.text.trim()),
+        educationLevel: education,
+        certificates: _optional(certificates.text),
+        learningReason: _optional(learningReason.text),
+        dailyMinutes: int.tryParse(dailyMinutes.text.trim()),
+        focusSkills: _optional(focusSkills.text),
+      );
+      if (mounted) Navigator.pop(context, updated);
+    } catch (_) {
+      if (mounted) {
+        setState(() => saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر حفظ معلوماتك، حاول مرة أخرى.')));
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    name.dispose();
+    age.dispose();
+    learningReason.dispose();
+    focusSkills.dispose();
+    certificates.dispose();
+    dailyMinutes.dispose();
+    super.dispose();
+  }
+
+  InputDecoration _decoration(String label) => InputDecoration(labelText: label, filled: true, fillColor: paper, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: line)), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: line)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: primary, width: 1.5)));
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: bg,
+        appBar: AppBar(backgroundColor: bg, elevation: 0, title: Text('تعديل معلوماتي', style: ar(17, weight: FontWeight.w800))),
+        body: ListView(padding: const EdgeInsets.fromLTRB(18, 10, 18, 30), children: [
+          _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('بياناتك الشخصية', style: ar(15, weight: FontWeight.w800)),
+            const SizedBox(height: 14),
+            TextField(controller: name, decoration: _decoration('الاسم')),
+            const SizedBox(height: 11),
+            TextField(controller: age, keyboardType: TextInputType.number, decoration: _decoration('العمر')),
+            const SizedBox(height: 11),
+            DropdownButtonFormField<String>(value: education, decoration: _decoration('المرحلة الدراسية'), items: levels.map((item) => DropdownMenuItem(value: item, child: Text(item, style: ar(13)))).toList(), onChanged: (value) { if (value != null) setState(() => education = value); }),
+            const SizedBox(height: 11),
+            TextField(controller: dailyMinutes, keyboardType: TextInputType.number, decoration: _decoration('كم دقيقة تتعلم يوميًا؟')),
+            const SizedBox(height: 11),
+            TextField(controller: learningReason, maxLines: 2, decoration: _decoration('لماذا تريد تعلم الإنجليزية؟')),
+            const SizedBox(height: 11),
+            TextField(controller: focusSkills, maxLines: 2, decoration: _decoration('المهارات التي تريد تطويرها')),
+            const SizedBox(height: 11),
+            TextField(controller: certificates, maxLines: 2, decoration: _decoration('الشهادات (اختياري)')),
+          ])),
+          const SizedBox(height: 18),
+          FilledButton(onPressed: saving ? null : _save, style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.symmetric(vertical: 16)), child: saving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Text('حفظ التعديلات', style: ar(14, weight: FontWeight.w700, color: Colors.white))),
+        ]),
+      ),
+    );
   }
 }
 
