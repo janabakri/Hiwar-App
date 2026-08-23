@@ -36,7 +36,8 @@ TextStyle mono(double size, {FontWeight weight = FontWeight.w500, Color color = 
 
 class HomeScreen extends StatefulWidget {
   final HiwarProfile? profile;
-  const HomeScreen({super.key, this.profile});
+  final Future<void> Function()? onSignOut;
+  const HomeScreen({super.key, this.profile, this.onSignOut});
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -53,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
       HomeContent(profile: widget.profile, onVoice: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => VoiceScreen(api: _api)))),
       ExploreContent(),
       ProgressContent(profile: widget.profile, onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: widget.profile?.userId, focusSkills: widget.profile?.focusSkills, onComplete: () { _open(0); Navigator.of(context).pop(); })))),
-      ProfileContent(api: _api, profile: widget.profile),
+      ProfileContent(api: _api, profile: widget.profile, onSignOut: widget.onSignOut),
     ];
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -589,7 +590,8 @@ class ProgressContent extends StatelessWidget {
 class ProfileContent extends StatefulWidget {
   final HiwarApi api;
   final HiwarProfile? profile;
-  const ProfileContent({super.key, required this.api, this.profile});
+  final Future<void> Function()? onSignOut;
+  const ProfileContent({super.key, required this.api, this.profile, this.onSignOut});
   @override State<ProfileContent> createState() => _ProfileContentState();
 }
 
@@ -632,6 +634,40 @@ class _ProfileContentState extends State<ProfileContent> {
       MaterialPageRoute(builder: (_) => ProfileEditScreen(api: widget.api, profile: current)),
     );
     if (updated != null && mounted) setState(() => editedProfile = updated);
+  }
+
+  Future<void> _confirmSignOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Text('تسجيل الخروج', style: ar(17, weight: FontWeight.w800)),
+          content: Text('هل أنت متأكد أنك تريد تسجيل الخروج؟', style: ar(13, color: inkSoft)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text('لا، إلغاء', style: ar(13, weight: FontWeight.w700, color: inkSoft))),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: FilledButton.styleFrom(backgroundColor: rust, foregroundColor: Colors.white),
+              child: Text('نعم، تسجيل الخروج', style: ar(13, weight: FontWeight.w700, color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      final onSignOut = widget.onSignOut;
+      if (onSignOut != null) {
+        await onSignOut();
+      } else {
+        await widget.api.signOut();
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تسجيل الخروج بنجاح.')));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تسجيل الخروج، حاول مرة أخرى.')));
+    }
   }
 
   @override
@@ -695,6 +731,8 @@ class _ProfileContentState extends State<ProfileContent> {
       )),
       if (loading) const Padding(padding: EdgeInsets.only(top: 16), child: Center(child: CircularProgressIndicator(color: primary))),
       if (!loading && error != null) Padding(padding: const EdgeInsets.only(top: 16), child: Text('تعذر تحميل الإحصاءات: $error', style: ar(11, color: rust))),
+      const SizedBox(height: 26),
+      _Card(child: SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: _confirmSignOut, icon: const Icon(Icons.logout_rounded, color: rust, size: 19), label: Text('تسجيل الخروج', style: ar(13.5, weight: FontWeight.w700, color: rust)), style: OutlinedButton.styleFrom(foregroundColor: rust, side: const BorderSide(color: Color(0xFFE8BFC3)), padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))))),
     ]);
   }
 }
