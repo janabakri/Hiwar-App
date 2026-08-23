@@ -26,7 +26,7 @@ class User(Base):
     focus_skills = Column(Text, nullable=True)
     profile_complete = Column(Boolean, default=False, nullable=False)
     password_hash = Column(String(255), nullable=True)
-    verification_code = Column(String(10), nullable=True)
+    verification_code = Column(String(64), nullable=True)
     verification_expires_at = Column(DateTime, nullable=True)
     email_verified = Column(Boolean, default=False, nullable=False)
     
@@ -47,4 +47,4 @@ class User(Base):
     
     # Relationships
     errors = relationship("UserError", back_populates="user")
-    conversation_turns = relationship("ConversationTurn", back_populates="user", cascade="all, delete-orphan")
+    conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")

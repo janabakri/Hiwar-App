@@ -9,7 +9,7 @@ from .core.config import settings
 from .core.database import engine, Base
 from .core.migrations import ensure_user_profile_columns
 from .api.v1 import chat, profile, assessment
-from .models import conversation  # noqa: F401  # register ConversationTurn before create_all
+from .models import conversation  # noqa: F401  # register Conversation before create_all
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
