@@ -265,14 +265,17 @@ class HiwarApi {
     await prefs.setString('hiwar_user_id', userId.trim());
   }
 
+  static const _welcomeVersion = 2;
+
   Future<bool> hasSeenWelcome() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('hiwar_welcome_seen') ?? false;
+    return prefs.getBool('hiwar_welcome_seen') == true && prefs.getInt('hiwar_welcome_version') == _welcomeVersion;
   }
 
   Future<void> markWelcomeSeen() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('hiwar_welcome_seen', true);
+    await prefs.setInt('hiwar_welcome_version', _welcomeVersion);
   }
 
   Future<HiwarStats> getStats(String userId) async {
