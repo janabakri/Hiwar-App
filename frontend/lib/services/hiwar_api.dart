@@ -185,6 +185,16 @@ class HiwarApi {
     await prefs.remove('hiwar_user_id');
   }
 
+  Future<String> getVoicePreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('hiwar_voice_preference') ?? 'female';
+  }
+
+  Future<void> saveVoicePreference(String preference) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('hiwar_voice_preference', preference);
+  }
+
   Future<Map<String, dynamic>> signUp({required String name, required String email, required String password}) async {
     final response = await _dio.post('/api/v1/auth/sign-up', data: {'name': name, 'email': email, 'password': password});
     return Map<String, dynamic>.from(response.data as Map);
