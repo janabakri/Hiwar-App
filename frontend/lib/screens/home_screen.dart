@@ -732,7 +732,27 @@ class _ProfileContentState extends State<ProfileContent> {
       if (loading) const Padding(padding: EdgeInsets.only(top: 16), child: Center(child: CircularProgressIndicator(color: primary))),
       if (!loading && error != null) Padding(padding: const EdgeInsets.only(top: 16), child: Text('تعذر تحميل الإحصاءات: $error', style: ar(11, color: rust))),
       const SizedBox(height: 26),
-      _Card(child: SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: _confirmSignOut, icon: const Icon(Icons.logout_rounded, color: rust, size: 19), label: Text('تسجيل الخروج', style: ar(13.5, weight: FontWeight.w700, color: rust)), style: OutlinedButton.styleFrom(foregroundColor: rust, side: const BorderSide(color: Color(0xFFE8BFC3)), padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))))),
+      _Card(
+        child: SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _confirmSignOut,
+            icon: const Icon(Icons.logout_rounded, color: rust, size: 19),
+            label: Text(
+              'تسجيل الخروج',
+              style: ar(13.5, weight: FontWeight.w700, color: rust),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: rust,
+              side: const BorderSide(color: Color(0xFFE8BFC3)),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+        ),
+      ),
     ]);
   }
 }
