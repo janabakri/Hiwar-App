@@ -1,6 +1,7 @@
 // مرجع التصميم: نسخة Flutter من speak-app-prototype(2).html؛ RTL، هاتف دافئ، بطاقات بيضاء، بنفسجي #4B3F8F، شاشات home/voice/feedback/explore/progress/profile.
 import 'dart:async';
 import 'dart:math';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -160,6 +161,10 @@ class _VoiceScreenState extends State<VoiceScreen> {
   @override
   void initState() {
     super.initState();
+    tts.setErrorHandler((message) {
+      if (!mounted) return;
+      setState(() => status = 'تعذر تشغيل صوت المدرب من المتصفح. اضغط أيقونة الصوت أو تحقق من مستوى الصوت.');
+    });
     _speakOpening();
   }
 
@@ -175,14 +180,19 @@ class _VoiceScreenState extends State<VoiceScreen> {
       _ => 'Hi! I\'m ready to practice English with you. Tell me something about your day.',
     };
     if (mounted) setState(() => status = 'المدرب يبدأ المحادثة...');
-    await tts.setLanguage('en-US');
-    await tts.setSpeechRate(0.45);
-    await tts.setVolume(1.0);
-    await tts.setPitch(1.0);
-    await tts.awaitSpeakCompletion(true);
-    if (!mounted) return;
-    await tts.speak(opening);
-    if (mounted && !listening && !sending) setState(() => status = 'اضغط للبدء بالحديث');
+    try {
+      await tts.setLanguage('en-US');
+      await tts.setSpeechRate(0.45);
+      await tts.setVolume(1.0);
+      await tts.setPitch(1.0);
+      await tts.awaitSpeakCompletion(true);
+      if (!mounted) return;
+      await tts.speak(opening);
+      if (mounted && !listening && !sending) setState(() => status = 'اضغط للبدء بالحديث');
+    } catch (_) {
+      openingPlayed = false;
+      if (mounted) setState(() => status = 'اضغط للبدء بالحديث؛ سيظهر رد المدرب بعد كلامك.');
+    }
   }
 
   @override
@@ -207,12 +217,19 @@ class _VoiceScreenState extends State<VoiceScreen> {
       debugLogging: false,
       onStatus: (value) {
         if (!mounted) return;
-        if (value == 'done' || value == 'notListening') setState(() => listening = false);
+        final ended = value == 'done' || value == 'notListening';
+        final shouldSubmit = ended && !sending && !submittedCurrent && transcript.trim().isNotEmpty;
+        setState(() {
+          if (ended) listening = false;
+          if (shouldSubmit) status = 'جاري تحليل كلامك...';
+        });
+        if (shouldSubmit) unawaited(sendTranscript());
       },
       onError: (error) {
         if (!mounted) return;
         setState(() {
           listening = false;
+          submittedCurrent = false;
           status = 'تعذر تشغيل المايك: ${error.errorMsg}';
         });
       },
@@ -232,22 +249,32 @@ class _VoiceScreenState extends State<VoiceScreen> {
     timer ??= Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => seconds++);
     });
-    await speech.listen(
-      localeId: 'en_US',
-      listenMode: stt.ListenMode.dictation,
-      partialResults: true,
-      cancelOnError: true,
-      listenFor: const Duration(seconds: 60),
-      pauseFor: const Duration(seconds: 4),
-      onResult: (result) {
-        if (!mounted) return;
-        setState(() => transcript = result.recognizedWords);
-        if (result.finalResult) {
-          setState(() { listening = false; status = 'جاري تحليل كلامك...'; });
-          sendTranscript();
-        }
-      },
-    );
+    try {
+      await speech.listen(
+        localeId: 'en_US',
+        listenMode: stt.ListenMode.dictation,
+        partialResults: true,
+        cancelOnError: true,
+        listenFor: const Duration(seconds: 60),
+        pauseFor: const Duration(seconds: 4),
+        onResult: (result) {
+          if (!mounted) return;
+          setState(() => transcript = result.recognizedWords);
+          if (result.finalResult) {
+            setState(() { listening = false; status = 'جاري تحليل كلامك...'; });
+            unawaited(sendTranscript());
+          }
+        },
+      );
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          listening = false;
+          submittedCurrent = false;
+          status = 'تعذر بدء الاستماع. اسمح بالميكروفون من إعدادات Chrome ثم أعد المحاولة.';
+        });
+      }
+    }
   }
 
   Future<void> sendTranscript() async {
@@ -259,6 +286,8 @@ class _VoiceScreenState extends State<VoiceScreen> {
     }
     setState(() { sending = true; submittedCurrent = true; status = 'يفكر بالرد...'; });
     try {
+      final token = await widget.api.getAccessToken();
+      if (token == null || token.isEmpty) throw StateError('AUTH_MISSING');
       final userId = await widget.api.getStoredUserId() ?? await widget.api.getUserId();
       final result = await widget.api.sendChat(userId: userId, message: message, conversationId: conversationId);
       if (!mounted) return;
@@ -287,12 +316,17 @@ class _VoiceScreenState extends State<VoiceScreen> {
       }
     } catch (error) {
       if (mounted) {
+        final isUnauthorized = error is DioException && error.response?.statusCode == 401;
+        final isMissingAuth = error is StateError && error.message == 'AUTH_MISSING';
+        final message = isUnauthorized || isMissingAuth
+            ? 'انتهت جلسة الدخول. سجّل الخروج ثم ادخل من جديد قبل بدء المحادثة.'
+            : 'تعذر الوصول إلى Backend على ${widget.api.baseUrl}. تحقق من تشغيل الخادم وAPI_BASE_URL ثم حاول مرة أخرى.';
         setState(() {
           sending = false;
           submittedCurrent = false;
           analysisCompleted = false;
-          analysisError = 'تعذر الوصول إلى Backend على ${widget.api.baseUrl}. شغّل الخادم وتحقق من API_BASE_URL ثم حاول مرة أخرى.';
-          status = analysisError!;
+          analysisError = message;
+          status = message;
         });
       }
     }
@@ -726,7 +760,7 @@ class _ProfileContentState extends State<ProfileContent> {
           _profileTableRow('المرحلة الدراسية', profile?.educationLevel),
           _profileTableRow('أهداف التعلم', profile?.learningReason),
           _profileTableRow('المهارات المطلوبة', profile?.focusSkills),
-          _profileTableRow('الشهادات', profile?.certificates),
+          _profileTableRow('البريد الإلكتروني', profile?.email),
         ],
       )),
       if (loading) const Padding(padding: EdgeInsets.only(top: 16), child: Center(child: CircularProgressIndicator(color: primary))),
@@ -771,7 +805,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   late final TextEditingController age;
   late final TextEditingController learningReason;
   late final TextEditingController focusSkills;
-  late final TextEditingController certificates;
   late final TextEditingController dailyMinutes;
   late String education;
   bool saving = false;
@@ -786,7 +819,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     age = TextEditingController(text: profile.age?.toString() ?? '');
     learningReason = TextEditingController(text: profile.learningReason ?? '');
     focusSkills = TextEditingController(text: profile.focusSkills ?? '');
-    certificates = TextEditingController(text: profile.certificates ?? '');
     dailyMinutes = TextEditingController(text: profile.dailyMinutes?.toString() ?? '');
     education = levels.contains(profile.educationLevel) ? profile.educationLevel! : 'متوسط';
   }
@@ -802,7 +834,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         name: name.text.trim(),
         age: int.tryParse(age.text.trim()),
         educationLevel: education,
-        certificates: _optional(certificates.text),
         learningReason: _optional(learningReason.text),
         dailyMinutes: int.tryParse(dailyMinutes.text.trim()),
         focusSkills: _optional(focusSkills.text),
@@ -822,7 +853,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     age.dispose();
     learningReason.dispose();
     focusSkills.dispose();
-    certificates.dispose();
     dailyMinutes.dispose();
     super.dispose();
   }
@@ -851,8 +881,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             TextField(controller: learningReason, maxLines: 2, decoration: _decoration('لماذا تريد تعلم الإنجليزية؟')),
             const SizedBox(height: 11),
             TextField(controller: focusSkills, maxLines: 2, decoration: _decoration('المهارات التي تريد تطويرها')),
-            const SizedBox(height: 11),
-            TextField(controller: certificates, maxLines: 2, decoration: _decoration('الشهادات (اختياري)')),
           ])),
           const SizedBox(height: 18),
           FilledButton(onPressed: saving ? null : _save, style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.symmetric(vertical: 16)), child: saving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Text('حفظ التعديلات', style: ar(14, weight: FontWeight.w700, color: Colors.white))),
