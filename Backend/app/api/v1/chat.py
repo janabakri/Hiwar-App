@@ -23,6 +23,21 @@ from openai import OpenAI
 router = APIRouter()
 
 
+def _parse_json_object(raw: str) -> dict:
+    """Parse a provider JSON response even if it adds a markdown fence."""
+    cleaned = raw.replace("```json", "").replace("```", "").strip()
+    try:
+        parsed = json.loads(cleaned)
+    except json.JSONDecodeError:
+        start, end = cleaned.find("{"), cleaned.rfind("}")
+        if start < 0 or end <= start:
+            raise
+        parsed = json.loads(cleaned[start:end + 1])
+    if not isinstance(parsed, dict):
+        raise ValueError("AI response must be a JSON object")
+    return parsed
+
+
 def _generate_gemini(prompt: str) -> str:
     """Generate a JSON tutor response without exposing the Gemini key to Flutter."""
     if not settings.GEMINI_API_KEY:
@@ -38,6 +53,15 @@ def _generate_gemini(prompt: str) -> str:
             "temperature": 0.4,
             "maxOutputTokens": 500,
             "responseMimeType": "application/json",
+            "responseSchema": {
+                "type": "OBJECT",
+                "properties": {
+                    "reply": {"type": "STRING"},
+                    "corrections": {"type": "ARRAY", "items": {"type": "OBJECT", "properties": {"wrong": {"type": "STRING"}, "correct": {"type": "STRING"}, "explanation": {"type": "STRING"}}}},
+                    "tips": {"type": "ARRAY", "items": {"type": "STRING"}},
+                },
+                "required": ["reply", "corrections", "tips"],
+            },
         },
     }
     response = httpx.post(
@@ -176,9 +200,10 @@ def chat(
     """
 
     provider = settings.AI_TEXT_PROVIDER.strip().lower()
-    provider_key_available = (
-        (provider == 'gemini' and bool(settings.GEMINI_API_KEY))
-        or (provider != 'gemini' and bool(settings.OPENAI_API_KEY))
+    if provider not in {'gemini', 'openai'}:
+        provider = 'gemini' if settings.GEMINI_API_KEY else 'openai'
+    provider_key_available = bool(
+        settings.GEMINI_API_KEY if provider == 'gemini' else settings.OPENAI_API_KEY
     )
 
     if provider_key_available:
@@ -199,7 +224,7 @@ def chat(
                 )
                 raw_output = response.choices[0].message.content or ""
 
-            parsed = json.loads(raw_output)
+            parsed = _parse_json_object(raw_output)
             if isinstance(parsed.get("reply"), str) and parsed["reply"].strip():
                 reply = parsed["reply"].strip()
                 analysis_completed = True
@@ -235,7 +260,7 @@ def chat(
                 analysis_message = 'لم يكتمل تحليل هذه الرسالة بسبب تعذر الوصول إلى مزود AI. تحقق من إعدادات Backend ثم أعد المحاولة.'
             reply = analysis_message
     else:
-        analysis_message = 'لم يكتمل تحليل هذه الرسالة لأن مزود AI غير مهيأ. تحقق من AI_TEXT_PROVIDER ومفتاحه في Backend.'
+        analysis_message = f'لم يكتمل تحليل هذه الرسالة لأن مزود {provider.upper()} غير مهيأ. تحقق من مفتاحه في Backend/.env ثم أعد تشغيل الخادم.'
         reply = analysis_message
     
     # 5. Prepare corrections
