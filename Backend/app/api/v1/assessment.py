@@ -2,6 +2,7 @@
 import json
 from typing import List
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from openai import OpenAI
 from pydantic import BaseModel, Field
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session
 from ...core.config import settings
 from ...core.database import get_db
 from ...models.user import User
+from ...core.security import enforce_owner, get_current_user
 
 router = APIRouter()
 
@@ -32,93 +34,81 @@ class LevelResultRequest(BaseModel):
     score: int = Field(ge=0, le=100)
 
 
-def _ai_json(instruction: str, schema_name: str, schema: dict) -> dict | None:
-    if not settings.OPENAI_API_KEY:
-        return None
+def _ai_json(instruction: str) -> dict | None:
+    provider = settings.AI_TEXT_PROVIDER.strip().lower()
     try:
-        client = OpenAI(api_key=settings.OPENAI_API_KEY, base_url=settings.OPENAI_BASE_URL)
-        response = client.chat.completions.create(
-            model=settings.OPENAI_MODEL,
-            messages=[
-                {"role": "system", "content": "You are an English assessment examiner. Return valid JSON only."},
-                {"role": "user", "content": instruction},
-            ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": schema_name,
-                    "strict": True,
-                    "schema": schema,
+        if provider == "gemini":
+            if not settings.GEMINI_API_KEY:
+                return None
+            response = httpx.post(
+                "https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{settings.GEMINI_MODEL}:generateContent",
+                params={"key": settings.GEMINI_API_KEY},
+                json={
+                    "contents": [{"role": "user", "parts": [{"text": instruction}]}],
+                    "generationConfig": {
+                        "temperature": 0.1,
+                        "maxOutputTokens": 500,
+                        "responseMimeType": "application/json",
+                    },
                 },
-            },
-            temperature=0.1,
-            max_tokens=500,
-        )
-        content = response.choices[0].message.content or "{}"
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+            candidates = data.get("candidates") or []
+            parts = ((candidates[0].get("content") or {}).get("parts") or []) if candidates else []
+            content = "".join(str(part.get("text", "")) for part in parts).strip()
+        else:
+            if not settings.OPENAI_API_KEY:
+                return None
+            client = OpenAI(api_key=settings.OPENAI_API_KEY, base_url=settings.OPENAI_BASE_URL)
+            response = client.chat.completions.create(
+                model=settings.OPENAI_MODEL,
+                messages=[
+                    {"role": "system", "content": "You are an English assessment examiner. Return valid JSON only."},
+                    {"role": "user", "content": instruction},
+                ],
+                temperature=0.1,
+                max_tokens=500,
+                response_format={"type": "json_object"},
+            )
+            content = response.choices[0].message.content or "{}"
+
         content = content.replace("```json", "").replace("```", "").strip()
-        return json.loads(content)
-    except Exception:
+        return json.loads(content) if content else None
+    except Exception as exc:
+        print(f"AI assessment provider error: {exc}")
         return None
 
 
 @router.post("/assessment/reading")
-def assess_reading(request: ReadingRequest):
-    result = _ai_json(
-        f"""Assess this English reading answer.
+def assess_reading(request: ReadingRequest, current_user: User = Depends(get_current_user)):
+    enforce_owner(request.user_id, current_user)
+    result = _ai_json(f"""Assess this English reading answer.
 Passage: {request.passage}
-Answer: {request.answer}""",
-        "reading_assessment",
-        {
-            "type": "object",
-            "properties": {
-                "score": {"type": "integer", "minimum": 0, "maximum": 100},
-                "level": {"type": "string", "enum": ["A1", "A2", "B1", "B2", "C1"]},
-                "feedback": {"type": "string"},
-                "difficult_words": {"type": "array", "items": {"type": "string"}},
-                "pronunciation_help": {"type": "array", "items": {"type": "object", "properties": {"word": {"type": "string"}, "pronunciation": {"type": "string"}}, "required": ["word", "pronunciation"], "additionalProperties": False}},
-            },
-            "required": ["score", "level", "feedback", "difficult_words", "pronunciation_help"],
-            "additionalProperties": False,
-        },
-    )
+Answer: {request.answer}
+Return JSON with keys: score (0-100), level (A1/A2/B1/B2/C1), feedback (Arabic), difficult_words (array of strings), pronunciation_help (array of objects with word and pronunciation).""")
     if result is not None:
         return result
     return {"score": 0, "level": "pending", "feedback": "تحليل القراءة يحتاج تشغيل AI Backend.", "difficult_words": [], "pronunciation_help": []}
 
 
 @router.post("/assessment/speaking")
-def assess_speaking(request: SpeakingRequest):
-    result = _ai_json(
-        f"""Assess this English speaking transcript.
+def assess_speaking(request: SpeakingRequest, current_user: User = Depends(get_current_user)):
+    enforce_owner(request.user_id, current_user)
+    result = _ai_json(f"""Assess this English speaking transcript.
 Prompt: {request.prompt}
 Transcript: {request.transcript}
-Do not claim to assess pronunciation from text alone.""",
-        "speaking_assessment",
-        {
-            "type": "object",
-            "properties": {
-                "estimated_level": {"type": "string", "enum": ["A1", "A2", "B1", "B2", "C1"]},
-                "overall_score": {"type": "integer", "minimum": 0, "maximum": 100},
-                "grammar_score": {"type": "integer", "minimum": 0, "maximum": 100},
-                "vocabulary_score": {"type": "integer", "minimum": 0, "maximum": 100},
-                "fluency_score": {"type": "integer", "minimum": 0, "maximum": 100},
-                "sentence_structure_score": {"type": "integer", "minimum": 0, "maximum": 100},
-                "naturalness_score": {"type": "integer", "minimum": 0, "maximum": 100},
-                "feedback": {"type": "string"},
-                "corrections": {"type": "array", "items": {"type": "object", "properties": {"wrong": {"type": "string"}, "correct": {"type": "string"}, "explanation": {"type": "string"}}, "required": ["wrong", "correct", "explanation"], "additionalProperties": False}},
-                "pronunciation_note": {"type": "string"},
-            },
-            "required": ["estimated_level", "overall_score", "grammar_score", "vocabulary_score", "fluency_score", "sentence_structure_score", "naturalness_score", "feedback", "corrections", "pronunciation_note"],
-            "additionalProperties": False,
-        },
-    )
+Return JSON with keys: estimated_level (A1/A2/B1/B2/C1), overall_score (0-100), grammar_score, vocabulary_score, fluency_score, sentence_structure_score, naturalness_score, feedback (Arabic), corrections (array with wrong, correct, explanation). Do not claim to assess pronunciation from text alone; set pronunciation_note accordingly.""")
     if result is not None:
         return result
     return {"estimated_level": "pending", "overall_score": 0, "feedback": "تحليل التحدث يحتاج تشغيل AI Backend.", "corrections": [], "pronunciation_note": "لا يمكن تقييم النطق من النص وحده."}
 
 
 @router.post("/assessment/level")
-def save_level_result(request: LevelResultRequest, db: Session = Depends(get_db)):
+def save_level_result(request: LevelResultRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    enforce_owner(request.user_id, current_user)
     user = db.query(User).filter(User.user_id == request.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
