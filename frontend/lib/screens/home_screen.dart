@@ -56,7 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
         api: _api,
         profile: widget.profile,
         onVoice: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => VoiceScreen(api: _api))),
-        onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: widget.profile?.userId, focusSkills: widget.profile?.focusSkills, onComplete: () { _open(0); Navigator.of(context).pop(); })),
+        onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: widget.profile?.userId, focusSkills: widget.profile?.focusSkills, onComplete: () { _open(0); Navigator.of(context).pop(); }))),
       ),
       ExploreContent(),
       ProgressContent(profile: widget.profile, onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: widget.profile?.userId, focusSkills: widget.profile?.focusSkills, onComplete: () { _open(0); Navigator.of(context).pop(); })))),
