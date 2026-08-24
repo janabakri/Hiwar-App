@@ -6,6 +6,7 @@ import json
 from datetime import datetime
 from typing import Dict, List, Optional
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -20,6 +21,42 @@ from ...core.security import enforce_owner, get_current_user
 from openai import OpenAI
 
 router = APIRouter()
+
+
+def _generate_gemini(prompt: str) -> str:
+    """Generate a JSON tutor response without exposing the Gemini key to Flutter."""
+    if not settings.GEMINI_API_KEY:
+        raise RuntimeError("GEMINI_API_KEY is not configured")
+
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{settings.GEMINI_MODEL}:generateContent"
+    )
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.4,
+            "maxOutputTokens": 500,
+            "responseMimeType": "application/json",
+        },
+    }
+    response = httpx.post(
+        url,
+        params={"key": settings.GEMINI_API_KEY},
+        json=payload,
+        timeout=30.0,
+    )
+    response.raise_for_status()
+    data = response.json()
+    candidates = data.get("candidates") or []
+    if not candidates:
+        raise RuntimeError("Gemini returned no candidates")
+    parts = ((candidates[0].get("content") or {}).get("parts") or [])
+    text = "".join(str(part.get("text", "")) for part in parts).strip()
+    if not text:
+        raise RuntimeError("Gemini returned an empty response")
+    return text
+
 
 # === Data Models ===
 class ChatMessage(BaseModel):
@@ -112,46 +149,56 @@ def chat(
     
     db.commit()
     
-    # 4. Get AI response calibrated to the stored level.
+    # 4. Get an AI response calibrated to the stored level.
     assessed_level = (user.level or '').strip().lower()
     tutor_level = assessed_level if assessed_level not in {'', 'pending', 'intermediate'} or (user.level_score or 0) > 0 else 'not assessed yet'
-    reply = 'تم استلام رسالتك، لكن المدرب الذكي غير مفعّل حاليًا. أضف مفتاح مزود AI صالحًا في Backend ثم أعد المحاولة.'
+    reply = 'تم استلام رسالتك، لكن مزود الذكاء الاصطناعي غير مفعّل حاليًا. أضف مفتاحًا صالحًا في Backend ثم أعد المحاولة.'
     ai_tips: List[str] = []
     structured_corrections: List[Dict[str, str]] = []
     analysis_completed = False
     analysis_message: Optional[str] = 'لم يكتمل تحليل الذكاء الاصطناعي لهذه الرسالة.'
 
-    if settings.OPENAI_API_KEY:
+    prompt = f"""
+    You are an adaptive English conversation tutor. The learner's assessed level is: {tutor_level}.
+    Do not claim a higher level than the evidence supports. If the learner is not assessed yet, use simple, natural English and gather evidence gradually.
+    Recent conversation context (oldest to newest): {context_messages}
+    Learner message: {request.message}
+    New errors found in this message: {fresh_errors}
+
+    Requirements:
+    1. Reply naturally at the learner's demonstrated level.
+    2. Correct only genuine grammar or vocabulary errors from this message, briefly and contextually.
+    3. Do not repeat a correction that is not in the new errors list.
+    4. Ask one fresh, relevant follow-up question; do not reuse a fixed prompt.
+    5. Do not make pronunciation claims from text alone.
+    6. Return only valid JSON with this shape:
+       {{"reply":"...","corrections":[{{"wrong":"...","correct":"...","explanation":"..."}}],"tips":["..."]}}
+    """
+
+    provider = settings.AI_TEXT_PROVIDER.strip().lower()
+    provider_key_available = (
+        (provider == 'gemini' and bool(settings.GEMINI_API_KEY))
+        or (provider != 'gemini' and bool(settings.OPENAI_API_KEY))
+    )
+
+    if provider_key_available:
         try:
-            client = OpenAI(
-                api_key=settings.OPENAI_API_KEY,
-                base_url=settings.OPENAI_BASE_URL
-            )
-            
-            prompt = f"""
-            You are an adaptive English conversation tutor. The learner's assessed level is: {tutor_level}.
-            Do not claim a higher level than the evidence supports. If the learner is not assessed yet, use simple, natural English and gather evidence gradually.
-            Recent conversation context (oldest to newest): {context_messages}
-            Learner message: {request.message}
-            New errors found in this message: {fresh_errors}
-            
-            Requirements:
-            1. Reply naturally at the learner's demonstrated level.
-            2. Correct only genuine grammar or vocabulary errors from this message, briefly and contextually.
-            3. Do not repeat a correction that is not in the new errors list.
-            4. Ask one fresh, relevant follow-up question; do not reuse a fixed prompt.
-            5. Do not make pronunciation claims from text alone.
-            """
+            if provider == 'gemini':
+                raw_output = _generate_gemini(prompt)
+            else:
+                client = OpenAI(
+                    api_key=settings.OPENAI_API_KEY,
+                    base_url=settings.OPENAI_BASE_URL,
+                )
+                response = client.chat.completions.create(
+                    model=settings.OPENAI_MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.7,
+                    max_tokens=500,
+                    response_format={"type": "json_object"},
+                )
+                raw_output = response.choices[0].message.content or ""
 
-            response = client.chat.completions.create(
-                model=settings.OPENAI_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.7,
-                max_tokens=500,
-                response_format={"type": "json_object"},
-            )
-
-            raw_output = response.choices[0].message.content or ""
             parsed = json.loads(raw_output)
             if isinstance(parsed.get("reply"), str) and parsed["reply"].strip():
                 reply = parsed["reply"].strip()
@@ -170,17 +217,20 @@ def chat(
             ai_tips = [str(item) for item in parsed.get("tips", []) if item]
         except (json.JSONDecodeError, TypeError, ValueError) as exc:
             print(f"AI structured output error: {exc}")
-            ai_tips = []
+            analysis_message = 'لم يكتمل تحليل هذه الرسالة لأن مزود AI أعاد نتيجة غير مفهومة. حاول مرة أخرى.'
+            reply = analysis_message
         except Exception as exc:
             # Do not expose provider keys, quota details, or stack traces to app users.
             print(f"AI chat provider error: {exc}")
             message = str(exc).lower()
             if '429' in message or 'quota' in message or 'insufficient_quota' in message:
                 analysis_message = 'لم يكتمل تحليل هذه الرسالة لأن رصيد مزود AI غير متاح. اضبط مفتاحًا صالحًا ثم أعد المحاولة.'
-                reply = analysis_message
             else:
                 analysis_message = 'لم يكتمل تحليل هذه الرسالة بسبب تعذر الوصول إلى مزود AI. تحقق من إعدادات Backend ثم أعد المحاولة.'
-                reply = analysis_message
+            reply = analysis_message
+    else:
+        analysis_message = 'لم يكتمل تحليل هذه الرسالة لأن مزود AI غير مهيأ. تحقق من AI_TEXT_PROVIDER ومفتاحه في Backend.'
+        reply = analysis_message
     
     # 5. Prepare corrections
     corrections = structured_corrections or [
