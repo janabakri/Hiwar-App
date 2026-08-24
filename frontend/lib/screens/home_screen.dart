@@ -46,21 +46,46 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _index = 0;
   final _api = HiwarApi();
+  HiwarProfile? _profile;
+
+  @override
+  void initState() {
+    super.initState();
+    _profile = widget.profile;
+  }
 
   void _open(int index) => setState(() => _index = index);
+
+  Future<void> _refreshProfile() async {
+    final userId = _profile?.userId;
+    if (userId == null || userId.trim().isEmpty) return;
+    try {
+      final updated = await _api.getProfile(userId);
+      if (mounted) setState(() => _profile = updated);
+    } catch (_) {
+      // Keep the local profile visible if the refresh is temporarily unavailable.
+    }
+  }
+
+  Future<void> _completeLevelCheck() async {
+    await _refreshProfile();
+    if (!mounted) return;
+    _open(0);
+    if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+  }
 
   @override
   Widget build(BuildContext context) {
     final pages = [
       HomeContent(
         api: _api,
-        profile: widget.profile,
+        profile: _profile,
         onVoice: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => VoiceScreen(api: _api))),
-        onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: widget.profile?.userId, focusSkills: widget.profile?.focusSkills, onComplete: () { _open(0); Navigator.of(context).pop(); }))),
+        onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: _profile?.userId, focusSkills: _profile?.focusSkills, onComplete: _completeLevelCheck))),
       ),
       ExploreContent(),
-      ProgressContent(profile: widget.profile, onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: widget.profile?.userId, focusSkills: widget.profile?.focusSkills, onComplete: () { _open(0); Navigator.of(context).pop(); })))),
-      ProfileContent(api: _api, profile: widget.profile, onSignOut: widget.onSignOut),
+      ProgressContent(profile: _profile, onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: _profile?.userId, focusSkills: _profile?.focusSkills, onComplete: _completeLevelCheck)))),
+      ProfileContent(api: _api, profile: _profile, onSignOut: widget.onSignOut),
     ];
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -106,7 +131,48 @@ class _Card extends StatelessWidget {
 
 class _SectionTitle extends StatelessWidget { final String text; final String? tag; const _SectionTitle(this.text, {this.tag}); @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(top: 22, bottom: 10), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(text, style: ar(13, weight: FontWeight.w600, color: inkSoft)), if (tag != null) Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3), decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(20)), child: Text(tag!, style: ar(11, weight: FontWeight.w600, color: primary)))])); }
 
-class _Ring extends StatelessWidget { final String value; final String label; const _Ring({required this.value, this.label = 'التقدم'}); @override Widget build(BuildContext context) => Container(width: 64, height: 64, decoration: const BoxDecoration(shape: BoxShape.circle, gradient: SweepGradient(colors: [primary, primary, primaryTint, primaryTint])), child: Center(child: Container(width: 50, height: 50, decoration: const BoxDecoration(color: paper, shape: BoxShape.circle), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text('', style: TextStyle(height: 0)), Text(value, style: mono(12, weight: FontWeight.w600)), Text(label, style: ar(8, color: inkFaint))])))); }
+class _Ring extends StatelessWidget {
+  final String value;
+  final String label;
+  const _Ring({required this.value, this.label = 'التقدم'});
+
+  @override
+  Widget build(BuildContext context) {
+    final numeric = int.tryParse(value.replaceAll('%', '').trim());
+    final progress = numeric == null ? 0.0 : (numeric.clamp(0, 100) / 100).toDouble();
+    return SizedBox(
+      width: 68,
+      height: 68,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox(
+            width: 64,
+            height: 64,
+            child: CircularProgressIndicator(
+              value: progress,
+              strokeWidth: 6,
+              backgroundColor: primaryTint,
+              color: primary,
+            ),
+          ),
+          Container(
+            width: 50,
+            height: 50,
+            decoration: const BoxDecoration(color: paper, shape: BoxShape.circle),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(value, style: mono(12, weight: FontWeight.w600)),
+                Text(label, style: ar(8, color: inkFaint)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class HomeContent extends StatefulWidget {
   final HiwarApi api;
@@ -262,6 +328,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
   int? conversationId;
   bool submittedCurrent = false;
   bool openingPlayed = false;
+  String voicePreference = 'female';
   late final Map<String, String> sessionTopic = _conversationTopics[Random().nextInt(_conversationTopics.length)];
 
   @override
@@ -272,6 +339,43 @@ class _VoiceScreenState extends State<VoiceScreen> {
       setState(() => status = 'تعذر تشغيل صوت المدرب من المتصفح. اضغط أيقونة الصوت أو تحقق من مستوى الصوت.');
     });
     _speakOpening();
+  }
+
+  Future<void> _configureTts() async {
+    voicePreference = await widget.api.getVoicePreference();
+    await tts.setLanguage('en-US');
+    await tts.setSpeechRate(0.45);
+    await tts.setVolume(1.0);
+    await tts.setPitch(voicePreference == 'male' ? 0.82 : 1.08);
+
+    try {
+      final rawVoices = await tts.getVoices;
+      if (rawVoices is! List || rawVoices.isEmpty) return;
+      final preferredNames = voicePreference == 'male'
+          ? ['david', 'alex', 'daniel', 'george', 'guy', 'male']
+          : ['samantha', 'aria', 'jenny', 'zira', 'karen', 'female'];
+      Map<String, dynamic>? selected;
+      for (final raw in rawVoices) {
+        if (raw is! Map) continue;
+        final voice = Map<String, dynamic>.from(raw);
+        final locale = '${voice['locale'] ?? ''}'.toLowerCase();
+        final name = '${voice['name'] ?? ''}'.toLowerCase();
+        if (!locale.startsWith('en')) continue;
+        if (preferredNames.any(name.contains)) {
+          selected = voice;
+          break;
+        }
+        selected ??= voice;
+      }
+      if (selected != null && selected['name'] != null) {
+        await tts.setVoice({
+          'name': '${selected['name']}',
+          'locale': '${selected['locale'] ?? 'en-US'}',
+        });
+      }
+    } catch (_) {
+      // The browser may expose no selectable voices; pitch remains the fallback.
+    }
   }
 
   Future<void> _speakOpening() async {
@@ -287,10 +391,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
     };
     if (mounted) setState(() => status = 'المدرب يبدأ المحادثة...');
     try {
-      await tts.setLanguage('en-US');
-      await tts.setSpeechRate(0.45);
-      await tts.setVolume(1.0);
-      await tts.setPitch(1.0);
+      await _configureTts();
       await tts.awaitSpeakCompletion(true);
       if (!mounted) return;
       await tts.speak(opening);
@@ -319,6 +420,12 @@ class _VoiceScreenState extends State<VoiceScreen> {
       return;
     }
 
+    // Chrome may block speech started outside a user gesture. Configure it here too.
+    try {
+      await _configureTts();
+    } catch (_) {
+      // The reply screen still offers a manual "استمع للرد" action.
+    }
     final available = await speech.initialize(
       debugLogging: false,
       onStatus: (value) {
@@ -383,6 +490,21 @@ class _VoiceScreenState extends State<VoiceScreen> {
     }
   }
 
+  Future<void> _speakReply() async {
+    final text = reply.trim();
+    if (text.isEmpty) return;
+    try {
+      await _configureTts();
+      await tts.awaitSpeakCompletion(true);
+      await tts.stop();
+      final result = await tts.speak(text);
+      if (result == 0) throw StateError('TTS_FAILED');
+      if (mounted) setState(() => status = 'صوت المدرب يعمل الآن');
+    } catch (_) {
+      if (mounted) setState(() => status = 'تعذر تشغيل الصوت تلقائيًا. اضغط «استمع للرد» مرة أخرى أو تحقق من صوت Chrome.');
+    }
+  }
+
   Future<void> sendTranscript() async {
     if (sending || submittedCurrent) return;
     final message = transcript.trim();
@@ -411,14 +533,8 @@ class _VoiceScreenState extends State<VoiceScreen> {
         active = true;
         status = result.analysisCompleted ? 'يتحدث الآن...' : 'تم حفظ كلامك دون اكتمال التحليل';
       });
-      await tts.setLanguage('en-US');
-      await tts.setSpeechRate(0.45);
-      await tts.setVolume(1.0);
-      await tts.setPitch(1.0);
-      await tts.awaitSpeakCompletion(true);
       if (result.reply.trim().isNotEmpty) {
-        await tts.stop();
-        await tts.speak(result.reply);
+        await _speakReply();
       }
     } catch (error) {
       if (mounted) {
@@ -515,6 +631,31 @@ class _VoiceScreenState extends State<VoiceScreen> {
               TextButton.icon(onPressed: () => setState(() => showTranscript = !showTranscript), icon: Icon(showTranscript ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 17), label: Text(showTranscript ? 'إخفاء كلامك' : 'إظهار كلامك', style: ar(11.5, color: primary))),
               if (showTranscript) Padding(padding: const EdgeInsets.symmetric(horizontal: 26), child: Text(transcript, textAlign: TextAlign.center, maxLines: 3, overflow: TextOverflow.ellipsis, style: ar(12, color: inkSoft))),
             ],
+            if (reply.trim().isNotEmpty) Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: _Card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      const Icon(Icons.volume_up_outlined, size: 18, color: primary),
+                      const SizedBox(width: 7),
+                      Text('رد المدرب', style: ar(12.5, weight: FontWeight.w800)),
+                    ]),
+                    const SizedBox(height: 7),
+                    Text(reply, style: en(13, color: inkSoft).copyWith(height: 1.55)),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: sending ? null : _speakReply,
+                        icon: const Icon(Icons.play_arrow_rounded, size: 17),
+                        label: Text('استمع للرد', style: ar(11.5, color: primary, weight: FontWeight.w700)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 8),
             Text(elapsed, style: mono(13, color: inkFaint)),
           ]),
@@ -714,11 +855,12 @@ class ProgressContent extends StatelessWidget {
   const ProgressContent({super.key, this.profile, this.onLevelCheck});
   @override
   Widget build(BuildContext context) {
-    final level = profile?.level.trim().isNotEmpty == true && profile!.level != 'pending' ? profile!.level : 'لم يحدد بعد';
+    final score = profile?.levelScore ?? 0;
+    final level = score > 0 && profile?.level.trim().isNotEmpty == true && profile!.level != 'pending' ? profile!.level : 'لم يحدد بعد';
     final days = profile?.daysSinceJoined ?? 0;
     return ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 28), children: [
     const _SectionTitle('تقدّم'),
-    _Card(child: Row(children: [_Ring(value: '${profile?.levelScore ?? 0}%', label: 'المستوى'), const SizedBox(width: 16), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(level, style: ar(14.5, weight: FontWeight.w700)), Text(days == 0 ? 'ابدأ أول جلسة لك' : 'عضو منذ $days يوم', style: ar(12, color: inkFaint))])])),
+    _Card(child: Row(children: [_Ring(value: score > 0 ? '$score%' : '—', label: 'المستوى'), const SizedBox(width: 16), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(level, style: ar(14.5, weight: FontWeight.w700)), Text(days == 0 ? 'ابدأ أول جلسة لك' : 'عضو منذ $days يوم', style: ar(12, color: inkFaint))])])),
     const SizedBox(height: 14),
     _Card(onTap: onLevelCheck, child: Row(children: [const _LevelMeterArt(size: 58), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('حدد مستواك من جديد', style: ar(14, weight: FontWeight.w700)), Text('اختبار قصير يعطيك مسارًا أدق', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left, color: inkFaint)])),
     const _SectionTitle('سجل الأخطاء المتكررة'),
@@ -741,12 +883,59 @@ class _ProfileContentState extends State<ProfileContent> {
   String? error;
   bool loading = true;
   bool reminderEnabled = true;
+  String voicePreference = 'female';
 
   @override
   void initState() {
     super.initState();
     editedProfile = widget.profile;
     _load();
+    _loadVoicePreference();
+  }
+
+  Future<void> _loadVoicePreference() async {
+    final preference = await widget.api.getVoicePreference();
+    if (mounted) setState(() => voicePreference = preference);
+  }
+
+  Future<void> _chooseVoice() async {
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SimpleDialog(
+          title: Text('صوت المدرب', style: ar(17, weight: FontWeight.w800)),
+          children: [
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(dialogContext, 'female'),
+              child: Row(children: [
+                const Icon(Icons.record_voice_over_outlined, color: primary),
+                const SizedBox(width: 10),
+                Text('صوت بنت', style: ar(14, weight: FontWeight.w600)),
+                const Spacer(),
+                if (voicePreference == 'female') const Icon(Icons.check_rounded, color: primary),
+              ]),
+            ),
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(dialogContext, 'male'),
+              child: Row(children: [
+                const Icon(Icons.record_voice_over_outlined, color: primary),
+                const SizedBox(width: 10),
+                Text('صوت ولد', style: ar(14, weight: FontWeight.w600)),
+                const Spacer(),
+                if (voicePreference == 'male') const Icon(Icons.check_rounded, color: primary),
+              ]),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (selected == null) return;
+    await widget.api.saveVoicePreference(selected);
+    if (mounted) {
+      setState(() => voicePreference = selected);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم اختيار ${selected == 'male' ? 'صوت ولد' : 'صوت بنت'} للمدرب.')));
+    }
   }
 
   Future<void> _load() async {
@@ -853,7 +1042,7 @@ class _ProfileContentState extends State<ProfileContent> {
       _Card(child: Column(children: [
         _TrainingRow(icon: Icons.access_time_rounded, title: 'الهدف اليومي', value: profile?.dailyMinutes == null ? 'غير محدد' : '${profile!.dailyMinutes} دقيقة', onTap: _editProfile),
         const Divider(height: 1, color: line),
-        _TrainingRow(icon: Icons.mic_none_rounded, title: 'لهجة الذكاء الاصطناعي', value: 'American', onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('إعداد اللهجة سيتوفر قريبًا.')))),
+        _TrainingRow(icon: Icons.record_voice_over_outlined, title: 'صوت المدرب', value: voicePreference == 'male' ? 'صوت ولد' : 'صوت بنت', onTap: _chooseVoice),
         const Divider(height: 1, color: line),
         _TrainingRow(icon: Icons.notifications_none_rounded, title: 'تذكير المحادثة اليومية', value: reminderEnabled ? 'مفعّل' : 'متوقف', trailing: Switch(value: reminderEnabled, onChanged: (value) => setState(() => reminderEnabled = value)), onTap: () => setState(() => reminderEnabled = !reminderEnabled)),
       ])),
@@ -1236,7 +1425,7 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
   @override
   void dispose() { speech.stop(); tts.stop(); videoController.dispose(); super.dispose(); }
 
-  List<Map<String, Object>> get currentQuestions => section == 0 ? grammar : vocabulary;
+  List<Map<String, Object>> get currentQuestions => (section == 0 ? grammar : vocabulary).take(5).toList();
 
   void answer(int index) {
     answeredQuestions++;
@@ -1303,7 +1492,17 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
   }
 
   Future<void> finish() async {
-    if (widget.api == null || widget.userId == null) return;
+    if (widget.api == null || widget.userId == null) {
+      if (mounted) {
+        setState(() {
+          resultScore = ((score / 12) * 100).round().clamp(0, 100).toInt();
+          resultKnowledgeScore = resultScore;
+          resultLevel = levelFromScore(resultScore);
+          showResult = true;
+        });
+      }
+      return;
+    }
     setState(() => analyzing = true);
     try {
       speakingAnalysis = await widget.api!.assessSpeaking(userId: widget.userId!, prompt: 'Tell me about yourself.', transcript: spokenText);
@@ -1311,13 +1510,19 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
       speakingAnalysis = {'estimated_level': 'pending', 'overall_score': score * 10, 'feedback': 'تعذر الاتصال بتحليل AI. يمكنك إعادة المحاولة بعد تشغيل Backend.'};
     }
     final remoteLevel = '${speakingAnalysis['estimated_level'] ?? ''}'.trim().toUpperCase();
-    final speakingScore = (speakingAnalysis['overall_score'] as num?)?.toInt();
+    final rawSpeakingScore = speakingAnalysis['overall_score'];
+    final speakingScore = rawSpeakingScore is num ? rawSpeakingScore.toInt() : int.tryParse('$rawSpeakingScore');
     final knowledgeScore = ((score / 12) * 100).round().clamp(0, 100).toInt();
     final finalScore = speakingScore == null || speakingScore <= 0 ? knowledgeScore : ((knowledgeScore * .5) + (speakingScore * .5)).round().clamp(0, 100).toInt();
     final computedLevel = levelFromScore(finalScore);
     final aiLevelIsValid = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].any((level) => remoteLevel.startsWith(level));
     final estimated = aiLevelIsValid ? remoteLevel : computedLevel;
-    try { await widget.api!.saveLevelResult(userId: widget.userId!, level: estimated, score: finalScore); } catch (_) {}
+    String? saveError;
+    try {
+      await widget.api!.saveLevelResult(userId: widget.userId!, level: estimated, score: finalScore);
+    } catch (_) {
+      saveError = 'تعذر حفظ النتيجة على الحساب. ستظهر النتيجة هنا، لكن أعد تشغيل Backend ثم جرّب الاختبار مرة أخرى إذا لم تظهر في الرئيسية.';
+    }
     if (!mounted) return;
     setState(() {
       analyzing = false;
@@ -1325,6 +1530,7 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
       resultKnowledgeScore = knowledgeScore;
       resultLevel = estimated;
       showResult = true;
+      if (saveError != null) speakingAnalysis = {...speakingAnalysis, 'save_error': saveError};
     });
   }
 
@@ -1359,7 +1565,35 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
         padding: const EdgeInsets.fromLTRB(20, 26, 20, 22),
         decoration: BoxDecoration(color: paper, borderRadius: BorderRadius.circular(28), border: Border.all(color: line)),
         child: Column(children: [
-          Container(width: 104, height: 104, decoration: BoxDecoration(color: primary, shape: BoxShape.circle, boxShadow: [BoxShadow(color: primary.withOpacity(.25), blurRadius: 22, offset: const Offset(0, 10))]), child: Center(child: Text('$percent%', style: ar(24, weight: FontWeight.w800, color: Colors.white)))),
+          SizedBox(
+            width: 116,
+            height: 116,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 108,
+                  height: 108,
+                  child: CircularProgressIndicator(
+                    value: percent / 100,
+                    strokeWidth: 9,
+                    backgroundColor: primaryTint,
+                    color: primary,
+                  ),
+                ),
+                Container(
+                  width: 88,
+                  height: 88,
+                  decoration: BoxDecoration(
+                    color: paper,
+                    shape: BoxShape.circle,
+                    boxShadow: [BoxShadow(color: primary.withOpacity(.16), blurRadius: 18, offset: const Offset(0, 8))],
+                  ),
+                  child: Center(child: Text('$percent%', style: ar(24, weight: FontWeight.w800, color: primary))),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 16),
           Text('مستواك التقديري', style: ar(12, color: inkFaint)),
           const SizedBox(height: 4),
@@ -1385,6 +1619,10 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
         Text('ملخص الاختبار', style: ar(14, weight: FontWeight.w800)),
         const SizedBox(height: 10),
         Text('${speakingAnalysis['feedback'] ?? 'تحليل AI جاهز.'}', style: ar(12.5, color: inkSoft).copyWith(height: 1.7)),
+        if (speakingAnalysis['save_error'] != null) ...[
+          const SizedBox(height: 8),
+          Text('${speakingAnalysis['save_error']}', style: ar(11.5, color: rust).copyWith(height: 1.6)),
+        ],
         const SizedBox(height: 8),
         Text('تم احتساب النتيجة من Grammar وVocabulary وReading وListening، مع تحليل إجابة Speaking.', style: ar(11, color: inkFaint).copyWith(height: 1.6)),
       ])),
