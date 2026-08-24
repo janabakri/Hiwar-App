@@ -52,7 +52,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      HomeContent(profile: widget.profile, onVoice: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => VoiceScreen(api: _api)))),
+      HomeContent(
+        api: _api,
+        profile: widget.profile,
+        onVoice: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => VoiceScreen(api: _api))),
+        onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: widget.profile?.userId, focusSkills: widget.profile?.focusSkills, onComplete: () { _open(0); Navigator.of(context).pop(); })),
+      ),
       ExploreContent(),
       ProgressContent(profile: widget.profile, onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: widget.profile?.userId, focusSkills: widget.profile?.focusSkills, onComplete: () { _open(0); Navigator.of(context).pop(); })))),
       ProfileContent(api: _api, profile: widget.profile, onSignOut: widget.onSignOut),
@@ -103,25 +108,126 @@ class _SectionTitle extends StatelessWidget { final String text; final String? t
 
 class _Ring extends StatelessWidget { final String value; final String label; const _Ring({required this.value, this.label = 'التقدم'}); @override Widget build(BuildContext context) => Container(width: 64, height: 64, decoration: const BoxDecoration(shape: BoxShape.circle, gradient: SweepGradient(colors: [primary, primary, primaryTint, primaryTint])), child: Center(child: Container(width: 50, height: 50, decoration: const BoxDecoration(color: paper, shape: BoxShape.circle), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text('', style: TextStyle(height: 0)), Text(value, style: mono(12, weight: FontWeight.w600)), Text(label, style: ar(8, color: inkFaint))])))); }
 
-class HomeContent extends StatelessWidget {
+class HomeContent extends StatefulWidget {
+  final HiwarApi api;
   final HiwarProfile? profile;
   final VoidCallback onVoice;
-  const HomeContent({super.key, this.profile, required this.onVoice});
+  final VoidCallback? onLevelCheck;
+  const HomeContent({super.key, required this.api, this.profile, required this.onVoice, this.onLevelCheck});
+
+  @override
+  State<HomeContent> createState() => _HomeContentState();
+}
+
+class _HomeContentState extends State<HomeContent> {
+  List<HiwarError> errors = const [];
+  HiwarStats? stats;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActivity();
+  }
+
+  Future<void> _loadActivity() async {
+    final userId = widget.profile?.userId;
+    if (userId == null || userId.trim().isEmpty) return;
+    try {
+      stats = await widget.api.getStats(userId);
+    } catch (_) {}
+    try {
+      errors = await widget.api.getErrors(userId);
+    } catch (_) {}
+    if (mounted) setState(() {});
+  }
+
+  bool get hasTraining => (stats?.totalSessions ?? 0) > 0 || errors.isNotEmpty;
+
   @override
   Widget build(BuildContext context) {
+    final profile = widget.profile;
     final rawLevel = profile?.level.trim().toLowerCase() ?? 'pending';
-    final hasAssessedLevel = (profile?.levelScore ?? 0) > 0 && rawLevel.isNotEmpty && rawLevel != 'pending' && rawLevel != 'intermediate';
-    final displayLevel = hasAssessedLevel ? profile!.level : 'لم يحدد بعد';
+    final score = profile?.levelScore ?? stats?.levelScore ?? 0;
+    final hasLevelResult = score > 0 && rawLevel.isNotEmpty && rawLevel != 'pending';
+    final hasManualLevel = rawLevel.isNotEmpty && rawLevel != 'pending' && rawLevel != 'intermediate' && !hasLevelResult;
+    final hasKnownLevel = hasLevelResult || hasManualLevel;
+    final needsLevelCheck = !hasKnownLevel && (profile?.focusSkills ?? '').contains('ما أعرف');
+    final displayLevel = hasKnownLevel ? profile!.level : 'لم يحدد بعد';
+    final name = profile?.name.trim().isNotEmpty == true ? profile!.name : 'في حوار';
+    final activityTitle = errors.isNotEmpty ? 'راجع ملاحظاتك الأخيرة' : 'ابدأ محادثة جديدة';
+    final activitySubtitle = errors.isNotEmpty ? 'تدريب مبني على كلامك الحقيقي' : 'سجّل أول جلسة ليظهر تقدمك هنا';
+
     return ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 28), children: [
-    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('مساء الخير، ${profile?.name ?? 'في حوار'}', style: ar(19, weight: FontWeight.w700)), Text('جاهز لمحادثة اليوم؟', style: ar(12.5, color: inkFaint))]), Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), decoration: BoxDecoration(color: coralTint, borderRadius: BorderRadius.circular(20)), child: Row(children: [const Icon(Icons.calendar_today_outlined, color: Color(0xFFB5451A), size: 14), const SizedBox(width: 5), Text(profile == null || profile!.daysSinceJoined == 0 ? 'عضو جديد' : 'منذ ${profile!.daysSinceJoined} يوم', style: ar(12.5, weight: FontWeight.w600, color: const Color(0xFFB5451A)))]))]),
-    const SizedBox(height: 18),
-    _Card(child: Row(children: [ _Ring(value: '${profile?.levelScore ?? 0}%'), const SizedBox(width: 16), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(displayLevel, style: ar(14.5, weight: FontWeight.w700)), Text(hasAssessedLevel ? 'نتيجتك من اختبار تحديد المستوى' : 'أكمل اختبار تحديد المستوى أولًا', style: ar(12, color: inkFaint)), const SizedBox(height: 5), Text(hasAssessedLevel ? '${profile?.levelScore ?? 0} نقطة مستوى' : 'لا توجد نتيجة بعد', style: mono(11.5, weight: FontWeight.w600, color: primary))])])),
-    const SizedBox(height: 26),
-    Column(children: [GestureDetector(onTap: onVoice, child: Container(width: 132, height: 132, decoration: const BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(center: Alignment(-.35, -.5), colors: [Color(0xFF6459A8), primary])), child: const Icon(Icons.mic_none, size: 44, color: Colors.white))), const SizedBox(height: 16), Text('ابدأ محادثة صوتية', style: ar(15.5, weight: FontWeight.w700)), const SizedBox(height: 3), Text('تحدّث بحرية، الذكاء الاصطناعي يستمع ويرد عليك', style: ar(12, color: inkFaint))]),
-    _SectionTitle('مقترح اليوم', tag: 'مبني على أدائك'),
-    _Card(onTap: onVoice, child: Row(children: [Container(width: 46, height: 46, decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.menu_book_outlined, color: primary)), const SizedBox(width: 14), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('التحدث في المطعم', style: ar(14, weight: FontWeight.w700)), Text('Ordering food at a restaurant', style: en(12.5, color: inkFaint))]), const Spacer(), Text('‹', style: ar(28, color: inkFaint))])),
-    const _SectionTitle('أخطاء تحتاج مراجعة'),
-    SizedBox(height: 78, child: ListView(scrollDirection: Axis.horizontal, children: const [_MistakeChip(wrong: 'I have went there', correct: 'I have gone there', category: 'الأزمنة — Present Perfect'), SizedBox(width: 10), _MistakeChip(wrong: 'since three years', correct: 'for three years', category: 'since / for'), SizedBox(width: 10), _MistakeChip(wrong: 'think / think', correct: '/θɪŋk/', category: 'نطق حرف th')])),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('مساء الخير، $name', style: ar(19, weight: FontWeight.w700)),
+          Text(hasTraining ? 'جاهز لمحادثة اليوم؟' : 'خلّنا نبدأ خطوتك الأولى', style: ar(12.5, color: inkFaint)),
+        ]),
+        Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), decoration: BoxDecoration(color: coralTint, borderRadius: BorderRadius.circular(20)), child: Row(children: [
+          const Icon(Icons.calendar_today_outlined, color: Color(0xFFB5451A), size: 14),
+          const SizedBox(width: 5),
+          Text(profile == null || profile.daysSinceJoined == 0 ? 'عضو جديد' : 'منذ ${profile.daysSinceJoined} يوم', style: ar(12.5, weight: FontWeight.w600, color: const Color(0xFFB5451A))),
+        ])),
+      ]),
+      const SizedBox(height: 18),
+      _Card(child: Row(children: [
+                  _Ring(value: hasLevelResult ? '$score%' : '—'),
+
+        const SizedBox(width: 16),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(displayLevel, style: ar(14.5, weight: FontWeight.w700)),
+          Text(hasLevelResult ? 'نتيجتك من اختبار تحديد المستوى' : hasManualLevel ? 'المستوى الذي اخترته' : 'لم نحدد مستواك بعد', style: ar(12, color: inkFaint)),
+          const SizedBox(height: 5),
+          Text(hasLevelResult ? '$score نقطة مستوى' : hasManualLevel ? 'يمكنك تغييره من اختبار المستوى' : 'نتيجتك تظهر بعد الاختبار', style: mono(11.5, weight: FontWeight.w600, color: primary)),
+        ])),
+      ])),
+      if (needsLevelCheck) ...[
+        const _SectionTitle('خطوتك الأولى'),
+        _Card(onTap: widget.onLevelCheck, child: Row(children: [
+          Container(width: 46, height: 46, decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.insights_outlined, color: primary)),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('خلّنا نحدد مستواك', style: ar(14, weight: FontWeight.w700)),
+            Text('اختبار قصير يختار لك مسارًا مناسبًا', style: ar(11.5, color: inkFaint)),
+          ])),
+          const Icon(Icons.chevron_left_rounded, color: inkFaint),
+        ])),
+      ],
+      const SizedBox(height: 26),
+      Column(children: [
+        GestureDetector(onTap: widget.onVoice, child: Container(width: 132, height: 132, decoration: const BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(center: Alignment(-.35, -.5), colors: [Color(0xFF6459A8), primary])), child: const Icon(Icons.mic_none, size: 44, color: Colors.white))),
+        const SizedBox(height: 16),
+        Text(hasTraining ? 'كمل محادثتك الصوتية' : 'ابدأ أول محادثة صوتية', style: ar(15.5, weight: FontWeight.w700)),
+        const SizedBox(height: 3),
+        Text('تحدّث بحرية، والمدرب يستمع ويرد عليك', style: ar(12, color: inkFaint)),
+      ]),
+      if (hasTraining) ...[
+        _SectionTitle('تدريبك التالي', tag: errors.isNotEmpty ? 'من سجلّك' : 'بعد أول جلسة'),
+        _Card(onTap: widget.onVoice, child: Row(children: [
+          Container(width: 46, height: 46, decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.record_voice_over_outlined, color: primary)),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(activityTitle, style: ar(14, weight: FontWeight.w700)), Text(activitySubtitle, style: ar(12.5, color: inkFaint))])),
+          const Icon(Icons.chevron_left_rounded, color: inkFaint),
+        ])),
+      ],
+      if (errors.isNotEmpty) ...[
+        const _SectionTitle('ملاحظاتك الأخيرة'),
+        SizedBox(height: 92, child: ListView(scrollDirection: Axis.horizontal, children: [
+          for (final error in errors.take(5)) ...[
+            _MistakeChip(wrong: error.wrong, correct: error.correct, category: error.errorType),
+            const SizedBox(width: 10),
+          ],
+        ])),
+      ] else ...[
+        const _SectionTitle('ملاحظاتك'),
+        _Card(child: Column(children: [
+          const Icon(Icons.auto_awesome_outlined, color: primary, size: 25),
+          const SizedBox(height: 8),
+          Text('ستظهر ملاحظاتك هنا بعد أول تدريب', textAlign: TextAlign.center, style: ar(13, weight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text('لا توجد أخطاء مسجلة بعد، وهذا طبيعي في البداية.', textAlign: TextAlign.center, style: ar(11.5, color: inkFaint)),
+        ])),
+      ],
     ]);
   }
 }
