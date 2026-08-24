@@ -36,6 +36,8 @@ class LevelResultRequest(BaseModel):
 
 def _ai_json(instruction: str) -> dict | None:
     provider = settings.AI_TEXT_PROVIDER.strip().lower()
+    if provider not in {"gemini", "openai"}:
+        provider = "gemini" if settings.GEMINI_API_KEY else "openai"
     try:
         if provider == "gemini":
             if not settings.GEMINI_API_KEY:
