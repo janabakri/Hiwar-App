@@ -328,6 +328,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
   int? conversationId;
   bool submittedCurrent = false;
   bool openingPlayed = false;
+  bool ttsConfigured = false;
   String voicePreference = 'female';
   late final Map<String, String> sessionTopic = _conversationTopics[Random().nextInt(_conversationTopics.length)];
 
@@ -341,7 +342,8 @@ class _VoiceScreenState extends State<VoiceScreen> {
     _speakOpening();
   }
 
-  Future<void> _configureTts() async {
+  Future<void> _configureTts({bool force = false}) async {
+    if (ttsConfigured && !force) return;
     voicePreference = await widget.api.getVoicePreference();
     await tts.setLanguage('en-US');
     // 0.45 felt noticeably slow in Chrome; keep a clear learner-friendly pace.
@@ -377,6 +379,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
     } catch (_) {
       // The browser may expose no selectable voices; pitch remains the fallback.
     }
+    ttsConfigured = true;
   }
 
   Future<void> _speakOpening() async {
@@ -493,7 +496,10 @@ class _VoiceScreenState extends State<VoiceScreen> {
 
   Future<void> _speakReply() async {
     final text = reply.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || !analysisCompleted) {
+      if (mounted) setState(() => status = 'لا يوجد رد صالح من المدرب حتى يكتمل تحليل Gemini.');
+      return;
+    }
     try {
       await _configureTts();
       await tts.awaitSpeakCompletion(true);
@@ -534,7 +540,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
         active = true;
         status = result.analysisCompleted ? 'يتحدث الآن...' : 'تم حفظ كلامك دون اكتمال التحليل';
       });
-      if (result.reply.trim().isNotEmpty) {
+      if (result.reply.trim().isNotEmpty && result.analysisCompleted) {
         await _speakReply();
       }
     } catch (error) {
@@ -588,9 +594,14 @@ class _VoiceScreenState extends State<VoiceScreen> {
         leading: IconButton(icon: const Icon(Icons.close, color: ink), onPressed: () => Navigator.pop(context)),
         title: Text('${sessionTopic['level']} · ${sessionTopic['title']}', style: ar(12, color: inkFaint)),
       ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
+      body: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 18),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
           Column(children: [
             const SizedBox(height: 60),
             Text(status, style: ar(13.5, weight: FontWeight.w600, color: inkSoft)),
@@ -645,7 +656,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
               TextButton.icon(onPressed: () => setState(() => showTranscript = !showTranscript), icon: Icon(showTranscript ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 17), label: Text(showTranscript ? 'إخفاء كلامك' : 'إظهار كلامك', style: ar(11.5, color: primary))),
               if (showTranscript) Padding(padding: const EdgeInsets.symmetric(horizontal: 26), child: Text(transcript, textAlign: TextAlign.center, maxLines: 3, overflow: TextOverflow.ellipsis, style: ar(12, color: inkSoft))),
             ],
-            if (reply.trim().isNotEmpty) Padding(
+            if (reply.trim().isNotEmpty && analysisCompleted) Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
               child: _Card(
                 child: Column(
@@ -681,7 +692,10 @@ class _VoiceScreenState extends State<VoiceScreen> {
               Column(children: [IconButton(onPressed: finishConversation, icon: const Icon(Icons.close), color: Colors.white, iconSize: 26, style: IconButton.styleFrom(backgroundColor: rust, fixedSize: const Size(64, 64))), Text('إنهاء', style: ar(11.5, color: inkFaint))]),
             ]),
           ),
-        ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
