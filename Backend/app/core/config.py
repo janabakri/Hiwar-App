@@ -53,7 +53,7 @@ class Settings:
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./app.db")
 
     # AI Providers
-    AI_TEXT_PROVIDER: str = os.getenv("AI_TEXT_PROVIDER", "openai").strip().lower()
+    AI_TEXT_PROVIDER: str = os.getenv("AI_TEXT_PROVIDER", "").strip().lower()
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")

@@ -1,4 +1,5 @@
 // مرجع التصميم: Speak RTL، خلفية دافئة، بنفسجي رئيسي، IBM Plex Sans Arabic/IBM Plex Sans/IBM Plex Mono.
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -10,7 +11,8 @@ import 'services/hiwar_api.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: '.env', isOptional: true);
+  // Backend secrets must stay server-side. Web already has a safe localhost fallback.
+  if (!kIsWeb) await dotenv.load(fileName: '.env', isOptional: true);
   runApp(const SpeakReplicaApp());
 }
 
