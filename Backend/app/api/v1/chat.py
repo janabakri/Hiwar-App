@@ -224,7 +224,13 @@ def chat(
             print(f"AI chat provider error: {exc}")
             message = str(exc).lower()
             if '429' in message or 'quota' in message or 'insufficient_quota' in message:
-                analysis_message = 'لم يكتمل تحليل هذه الرسالة لأن رصيد مزود AI غير متاح. اضبط مفتاحًا صالحًا ثم أعد المحاولة.'
+                analysis_message = 'لم يكتمل تحليل هذه الرسالة لأن حد استخدام مزود AI انتهى. تحقق من الخطة أو استخدم مزودًا آخر.'
+            elif 'api key not valid' in message or 'invalid api key' in message or 'permission denied' in message or '401' in message or '403' in message:
+                analysis_message = 'مفتاح Gemini غير صالح أو غير مفعّل. راجع GEMINI_API_KEY في Backend/.env ثم أعد تشغيل الخادم.'
+            elif '404' in message or 'not found' in message:
+                analysis_message = 'نموذج Gemini المحدد غير متاح لهذا المفتاح. راجع GEMINI_MODEL في Backend/.env.'
+            elif 'timeout' in message or 'timed out' in message:
+                analysis_message = 'انتهت مهلة الاتصال بمزود AI. تحقق من الإنترنت ثم حاول مرة أخرى.'
             else:
                 analysis_message = 'لم يكتمل تحليل هذه الرسالة بسبب تعذر الوصول إلى مزود AI. تحقق من إعدادات Backend ثم أعد المحاولة.'
             reply = analysis_message

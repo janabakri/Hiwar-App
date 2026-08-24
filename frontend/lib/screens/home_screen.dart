@@ -344,7 +344,8 @@ class _VoiceScreenState extends State<VoiceScreen> {
   Future<void> _configureTts() async {
     voicePreference = await widget.api.getVoicePreference();
     await tts.setLanguage('en-US');
-    await tts.setSpeechRate(0.45);
+    // 0.45 felt noticeably slow in Chrome; keep a clear learner-friendly pace.
+    await tts.setSpeechRate(0.65);
     await tts.setVolume(1.0);
     await tts.setPitch(voicePreference == 'male' ? 0.82 : 1.08);
 
@@ -627,6 +628,19 @@ class _VoiceScreenState extends State<VoiceScreen> {
               ),
             ),
             const SizedBox(height: 22),
+            if (analysisError != null) Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _Card(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.info_outline_rounded, size: 18, color: rust),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(analysisError!, style: ar(12, color: rust).copyWith(height: 1.6))),
+                  ],
+                ),
+              ),
+            ),
             if (transcript.isNotEmpty) ...[
               TextButton.icon(onPressed: () => setState(() => showTranscript = !showTranscript), icon: Icon(showTranscript ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 17), label: Text(showTranscript ? 'إخفاء كلامك' : 'إظهار كلامك', style: ar(11.5, color: primary))),
               if (showTranscript) Padding(padding: const EdgeInsets.symmetric(horizontal: 26), child: Text(transcript, textAlign: TextAlign.center, maxLines: 3, overflow: TextOverflow.ellipsis, style: ar(12, color: inkSoft))),
