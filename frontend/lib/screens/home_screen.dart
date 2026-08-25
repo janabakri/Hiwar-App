@@ -7,6 +7,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:video_player/video_player.dart';
+import '../features/progress/tutor_progress_content.dart';
+import '../features/reading/smart_reading_screen.dart';
+import '../features/speaking/smart_speaking_screen.dart';
 import '../services/hiwar_api.dart';
 
 const bg = Color(0xFFF6F3EF);
@@ -83,8 +86,8 @@ class _HomeScreenState extends State<HomeScreen> {
         onVoice: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => VoiceScreen(api: _api))),
         onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: _profile?.userId, focusSkills: _profile?.focusSkills, onComplete: _completeLevelCheck))),
       ),
-      ExploreContent(),
-      ProgressContent(profile: _profile, onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: _profile?.userId, focusSkills: _profile?.focusSkills, onComplete: _completeLevelCheck)))),
+      ExploreContent(api: _api, profile: _profile),
+      ProgressContent(api: _api, profile: _profile, onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: _profile?.userId, focusSkills: _profile?.focusSkills, onComplete: _completeLevelCheck)))),
       ProfileContent(api: _api, profile: _profile, onSignOut: widget.onSignOut),
     ];
     return Directionality(
@@ -837,29 +840,43 @@ class _WordChip extends StatelessWidget {
 }
 
 class ExploreContent extends StatelessWidget {
+  final HiwarApi api;
+  final HiwarProfile? profile;
+
+  const ExploreContent({super.key, required this.api, this.profile});
+
   @override
   Widget build(BuildContext context) => ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 28), children: [
     const _SectionTitle('استكشف'),
     Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(gradient: const LinearGradient(colors: [primaryDark, primary]), borderRadius: BorderRadius.circular(18)), child: Row(children: [
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('✦ اقتراح ذكي لك', style: ar(11, weight: FontWeight.w700, color: Colors.white)), const SizedBox(height: 8), Text('بناءً على محادثاتك الأخيرة، ركّزي هالأسبوع على Present Perfect ونطق حرف th — قبل ما ننتقل لمهارة جديدة.', style: ar(13, color: Colors.white).copyWith(height: 1.6))])),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('✦ معلمك يتكيف معك', style: ar(11, weight: FontWeight.w700, color: Colors.white)), const SizedBox(height: 8), Text('ابدأ جلسة Speaking أو Reading. بعد جمع أدلة كافية، سيحدد المعلم ما تحتاج مراجعته فعلاً.', style: ar(13, color: Colors.white).copyWith(height: 1.6))])),
       const SizedBox(width: 8),
       _SparkleArt(),
     ])),
     const SizedBox(height: 16),
-    GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1.05, children: [_Skill(title: 'التحدث', english: 'Speaking', value: 70, color: primaryTint), _Skill(title: 'الاستماع', english: 'Listening', value: 55, color: const Color(0xFFE7EEF7)), _Skill(title: 'القراءة', english: 'Reading', value: 48, color: const Color(0xFFF7EEDB)), _Skill(title: 'الكتابة', english: 'Writing', value: 40, color: const Color(0xFFF6E6EB)), _Skill(title: 'القواعد', english: 'Grammar', value: 58, color: const Color(0xFFE9E7F2)), _Skill(title: 'المفردات', english: 'Vocabulary', value: 65, color: const Color(0xFFF8E7E6))],),
+    GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1.05, children: [
+      _Skill(title: 'التحدث', english: 'Speaking', color: primaryTint, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SmartSpeakingScreen(api: api)))),
+      const _Skill(title: 'الاستماع', english: 'Listening', color: Color(0xFFE7EEF7)),
+      _Skill(title: 'القراءة', english: 'Reading', color: const Color(0xFFF7EEDB), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SmartReadingScreen(api: api, level: profile?.level)))),
+      const _Skill(title: 'الكتابة', english: 'Writing', color: Color(0xFFF6E6EB)),
+      const _Skill(title: 'القواعد', english: 'Grammar', color: Color(0xFFE9E7F2)),
+      const _Skill(title: 'المفردات', english: 'Vocabulary', color: Color(0xFFF8E7E6)),
+    ]),
   ]);
 }
 class _Skill extends StatelessWidget {
   final String title;
   final String english;
-  final int value;
+  final int? value;
   final Color color;
+  final VoidCallback? onTap;
 
-  const _Skill({required this.title, required this.english, required this.value, required this.color});
+  const _Skill({required this.title, required this.english, this.value, required this.color, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return _Card(
+      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -868,9 +885,12 @@ class _Skill extends StatelessWidget {
           Text(title, style: ar(13.5, weight: FontWeight.w700)),
           Text(english, style: en(11, color: inkFaint)),
           const Spacer(),
-          ClipRRect(borderRadius: BorderRadius.circular(5), child: LinearProgressIndicator(value: value / 100, minHeight: 5, backgroundColor: line, color: primary)),
-          const SizedBox(height: 5),
-          Text('$value%', style: mono(10.5, color: inkFaint)),
+          if (value != null) ...[
+            ClipRRect(borderRadius: BorderRadius.circular(5), child: LinearProgressIndicator(value: value! / 100, minHeight: 5, backgroundColor: line, color: primary)),
+            const SizedBox(height: 5),
+            Text('$value%', style: mono(10.5, color: inkFaint)),
+          ] else
+            Text(onTap == null ? 'قريبًا' : 'ابدأ الآن', style: ar(10.5, weight: FontWeight.w600, color: onTap == null ? inkFaint : primary)),
         ],
       ),
     );
@@ -878,9 +898,10 @@ class _Skill extends StatelessWidget {
 }
 
 class ProgressContent extends StatelessWidget {
+  final HiwarApi api;
   final HiwarProfile? profile;
   final VoidCallback? onLevelCheck;
-  const ProgressContent({super.key, this.profile, this.onLevelCheck});
+  const ProgressContent({super.key, required this.api, this.profile, this.onLevelCheck});
   @override
   Widget build(BuildContext context) {
     final score = profile?.levelScore ?? 0;
@@ -891,6 +912,16 @@ class ProgressContent extends StatelessWidget {
     _Card(child: Row(children: [_Ring(value: score > 0 ? '$score%' : '—', label: 'المستوى'), const SizedBox(width: 16), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(level, style: ar(14.5, weight: FontWeight.w700)), Text(days == 0 ? 'ابدأ أول جلسة لك' : 'عضو منذ $days يوم', style: ar(12, color: inkFaint))])])),
     const SizedBox(height: 14),
     _Card(onTap: onLevelCheck, child: Row(children: [const _LevelMeterArt(size: 58), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('حدد مستواك من جديد', style: ar(14, weight: FontWeight.w700)), Text('اختبار قصير يعطيك مسارًا أدق', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left, color: inkFaint)])),
+    const SizedBox(height: 14),
+    _Card(
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TutorProgressContent(api: api, profile: profile, onLevelCheck: onLevelCheck))),
+      child: Row(children: [
+        const CircleAvatar(radius: 29, backgroundColor: primaryTint, child: Icon(Icons.auto_awesome_rounded, color: primary)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('خطة المعلم الذكي', style: ar(14, weight: FontWeight.w700)), Text('خطة اليوم والذاكرة وتقدّم التحدث والقراءة', style: ar(11.5, color: inkFaint))])),
+        const Icon(Icons.chevron_left, color: inkFaint),
+      ]),
+    ),
     const _SectionTitle('سجل الأخطاء المتكررة'),
     _Card(child: ListTile(contentPadding: EdgeInsets.zero, leading: const CircleAvatar(radius: 12, backgroundColor: primaryTint, child: Icon(Icons.auto_awesome, size: 15, color: primary)), title: const Text('سجل أخطائك يظهر هنا'), subtitle: Text('بعد أول محادثة ستجد ملاحظاتك الحقيقية هنا', style: ar(11.5, color: inkFaint)))),
   ]);

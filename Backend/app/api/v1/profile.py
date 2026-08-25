@@ -127,7 +127,7 @@ def _verify_google_token(raw_token: Optional[str]) -> dict:
 def _issue_token(user: User) -> str:
     now = datetime.utcnow()
     payload = {"sub": user.user_id, "email": user.email, "iat": now, "exp": now + timedelta(hours=24)}
-    return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 
 def _send_verification_email(email: str, code: str) -> bool:

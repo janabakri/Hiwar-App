@@ -2,13 +2,11 @@
 import json
 from typing import List
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException
-from openai import OpenAI
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from ...core.config import settings
+from ...ai.providers.factory import create_text_provider
 from ...core.database import get_db
 from ...models.user import User
 from ...core.security import enforce_owner, get_current_user
@@ -35,48 +33,17 @@ class LevelResultRequest(BaseModel):
 
 
 def _ai_json(instruction: str) -> dict | None:
-    provider = settings.AI_TEXT_PROVIDER.strip().lower()
-    if provider not in {"gemini", "openai"}:
-        provider = "gemini" if settings.GEMINI_API_KEY else "openai"
     try:
-        if provider == "gemini":
-            if not settings.GEMINI_API_KEY:
-                return None
-            response = httpx.post(
-                "https://generativelanguage.googleapis.com/v1beta/models/"
-                f"{settings.GEMINI_MODEL}:generateContent",
-                params={"key": settings.GEMINI_API_KEY},
-                json={
-                    "contents": [{"role": "user", "parts": [{"text": instruction}]}],
-                    "generationConfig": {
-                        "temperature": 0.1,
-                        "maxOutputTokens": 500,
-                        "responseMimeType": "application/json",
-                    },
-                },
-                timeout=30.0,
-            )
-            response.raise_for_status()
-            data = response.json()
-            candidates = data.get("candidates") or []
-            parts = ((candidates[0].get("content") or {}).get("parts") or []) if candidates else []
-            content = "".join(str(part.get("text", "")) for part in parts).strip()
-        else:
-            if not settings.OPENAI_API_KEY:
-                return None
-            client = OpenAI(api_key=settings.OPENAI_API_KEY, base_url=settings.OPENAI_BASE_URL)
-            response = client.chat.completions.create(
-                model=settings.OPENAI_MODEL,
-                messages=[
-                    {"role": "system", "content": "You are an English assessment examiner. Return valid JSON only."},
-                    {"role": "user", "content": instruction},
-                ],
-                temperature=0.1,
-                max_tokens=500,
-                response_format={"type": "json_object"},
-            )
-            content = response.choices[0].message.content or "{}"
-
+        provider = create_text_provider()
+        generated = provider.generate_text(
+            system_prompt="You are an English assessment examiner. Return valid JSON only.",
+            user_prompt=instruction,
+            temperature=0.1,
+            json_mode=True,
+        )
+        if generated is None:
+            return None
+        content = generated.value
         content = content.replace("```json", "").replace("```", "").strip()
         return json.loads(content) if content else None
     except Exception as exc:
