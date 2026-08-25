@@ -6,19 +6,17 @@ import json
 from datetime import datetime
 from typing import Dict, List, Optional
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.config import settings
+from ...ai.providers.factory import create_text_provider
 from ...services.error_tracker import detect_errors
 from ...models.user import User
 from ...models.error import UserError
 from ...models.conversation import Conversation, Message
 from ...core.security import enforce_owner, get_current_user
-from openai import OpenAI
 
 router = APIRouter()
 
@@ -36,50 +34,6 @@ def _parse_json_object(raw: str) -> dict:
     if not isinstance(parsed, dict):
         raise ValueError("AI response must be a JSON object")
     return parsed
-
-
-def _generate_gemini(prompt: str) -> str:
-    """Generate a JSON tutor response without exposing the Gemini key to Flutter."""
-    if not settings.GEMINI_API_KEY:
-        raise RuntimeError("GEMINI_API_KEY is not configured")
-
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{settings.GEMINI_MODEL}:generateContent"
-    )
-    payload = {
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0.4,
-            "maxOutputTokens": 500,
-            "responseMimeType": "application/json",
-            "responseSchema": {
-                "type": "OBJECT",
-                "properties": {
-                    "reply": {"type": "STRING"},
-                    "corrections": {"type": "ARRAY", "items": {"type": "OBJECT", "properties": {"wrong": {"type": "STRING"}, "correct": {"type": "STRING"}, "explanation": {"type": "STRING"}}}},
-                    "tips": {"type": "ARRAY", "items": {"type": "STRING"}},
-                },
-                "required": ["reply", "corrections", "tips"],
-            },
-        },
-    }
-    response = httpx.post(
-        url,
-        params={"key": settings.GEMINI_API_KEY},
-        json=payload,
-        timeout=30.0,
-    )
-    response.raise_for_status()
-    data = response.json()
-    candidates = data.get("candidates") or []
-    if not candidates:
-        raise RuntimeError("Gemini returned no candidates")
-    parts = ((candidates[0].get("content") or {}).get("parts") or [])
-    text = "".join(str(part.get("text", "")) for part in parts).strip()
-    if not text:
-        raise RuntimeError("Gemini returned an empty response")
-    return text
 
 
 # === Data Models ===
@@ -199,30 +153,21 @@ def chat(
        {{"reply":"...","corrections":[{{"wrong":"...","correct":"...","explanation":"..."}}],"tips":["..."]}}
     """
 
-    provider = settings.AI_TEXT_PROVIDER.strip().lower()
-    if provider not in {'gemini', 'openai'}:
-        provider = 'gemini' if settings.GEMINI_API_KEY else 'openai'
-    provider_key_available = bool(
-        settings.GEMINI_API_KEY if provider == 'gemini' else settings.OPENAI_API_KEY
-    )
+    provider_adapter = create_text_provider()
+    provider = provider_adapter.__class__.__name__.replace('TextProvider', '').lower()
+    provider_key_available = provider_adapter.available
 
     if provider_key_available:
         try:
-            if provider == 'gemini':
-                raw_output = _generate_gemini(prompt)
-            else:
-                client = OpenAI(
-                    api_key=settings.OPENAI_API_KEY,
-                    base_url=settings.OPENAI_BASE_URL,
-                )
-                response = client.chat.completions.create(
-                    model=settings.OPENAI_MODEL,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.7,
-                    max_tokens=500,
-                    response_format={"type": "json_object"},
-                )
-                raw_output = response.choices[0].message.content or ""
+            generated = provider_adapter.generate_text(
+                system_prompt='You are an adaptive English tutor. Return valid JSON only.',
+                user_prompt=prompt,
+                temperature=0.4,
+                json_mode=True,
+            )
+            if generated is None:
+                raise RuntimeError(f'{provider} provider is not configured')
+            raw_output = generated.value
 
             parsed = _parse_json_object(raw_output)
             if isinstance(parsed.get("reply"), str) and parsed["reply"].strip():
@@ -251,9 +196,9 @@ def chat(
             if '429' in message or 'quota' in message or 'insufficient_quota' in message:
                 analysis_message = 'لم يكتمل تحليل هذه الرسالة لأن حد استخدام مزود AI انتهى. تحقق من الخطة أو استخدم مزودًا آخر.'
             elif 'api key not valid' in message or 'invalid api key' in message or 'permission denied' in message or '401' in message or '403' in message:
-                analysis_message = 'مفتاح Gemini غير صالح أو غير مفعّل. راجع GEMINI_API_KEY في Backend/.env ثم أعد تشغيل الخادم.'
+                analysis_message = f'مفتاح مزود {provider.upper()} غير صالح أو غير مفعّل. راجع إعدادات Backend ثم أعد تشغيل الخادم.'
             elif '404' in message or 'not found' in message:
-                analysis_message = 'نموذج Gemini المحدد غير متاح لهذا المفتاح. راجع GEMINI_MODEL في Backend/.env.'
+                analysis_message = f'نموذج {provider.upper()} المحدد غير متاح لهذا المفتاح. راجع إعداد النموذج في Backend.'
             elif 'timeout' in message or 'timed out' in message:
                 analysis_message = 'انتهت مهلة الاتصال بمزود AI. تحقق من الإنترنت ثم حاول مرة أخرى.'
             else:
