@@ -21,7 +21,9 @@ from sqlalchemy.orm import Session
 
 from ...core.database import get_db
 from ...models.user import User
+from ...models.error import UserError
 from ...core.config import settings
+from ...core.security import create_access_token, enforce_owner, get_current_user
 
 try:
     from google.oauth2 import id_token as google_id_token
@@ -74,6 +76,12 @@ def _normalize_verification_code(value: str) -> str:
     return ''.join(value.translate(digit_map).split())
 
 
+def _verification_digest(email: str, code: str) -> str:
+    if not settings.SECRET_KEY:
+        raise RuntimeError("SECRET_KEY is required for email verification")
+    return hmac.new(settings.SECRET_KEY.encode(), f"{email}:{code}".encode(), hashlib.sha256).hexdigest()
+
+
 def _hash_password(password: str) -> str:
     salt = secrets.token_bytes(16)
     digest = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 120_000)
@@ -122,12 +130,6 @@ def _verify_google_token(raw_token: Optional[str]) -> dict:
         raise
     except Exception as exc:
         raise HTTPException(status_code=401, detail="Invalid Google token") from exc
-
-
-def _issue_token(user: User) -> str:
-    now = datetime.utcnow()
-    payload = {"sub": user.user_id, "email": user.email, "iat": now, "exp": now + timedelta(hours=24)}
-    return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
 
 def _send_verification_email(email: str, code: str) -> bool:
@@ -184,7 +186,7 @@ def sign_up(request: SignUpRequest, db: Session = Depends(get_db)):
     user.name = request.name.strip()
     user.email = email
     user.password_hash = _hash_password(request.password)
-    user.verification_code = code
+    user.verification_code = _verification_digest(email, code)
     user.verification_expires_at = datetime.utcnow() + timedelta(minutes=10)
     user.email_verified = False
     user.auth_provider = "email"
@@ -203,7 +205,8 @@ def verify_email(request: VerifyEmailRequest, db: Session = Depends(get_db)):
     email = request.email.strip().lower()
     code = _normalize_verification_code(request.code)
     user = db.query(User).filter(User.email == email).first()
-    if not user or _normalize_verification_code(user.verification_code or '') != code or not user.verification_expires_at or user.verification_expires_at < datetime.utcnow():
+    expected = _verification_digest(email, code)
+    if not user or not hmac.compare_digest(user.verification_code or '', expected) or not user.verification_expires_at or user.verification_expires_at < datetime.utcnow():
         raise HTTPException(status_code=400, detail="رمز التحقق غير صحيح أو منتهي")
     user.email_verified = True
     user.verification_code = None
@@ -212,7 +215,7 @@ def verify_email(request: VerifyEmailRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     result = _serialize(user)
-    result["access_token"] = _issue_token(user)
+    result["access_token"] = create_access_token(user)
     result["token_type"] = "bearer"
     return result
 
@@ -229,15 +232,13 @@ def password_sign_in(request: PasswordSignInRequest, db: Session = Depends(get_d
     db.commit()
     db.refresh(user)
     result = _serialize(user)
-    result["access_token"] = _issue_token(user)
+    result["access_token"] = create_access_token(user)
     result["token_type"] = "bearer"
     return result
 
 
 @router.post("/auth/sign-in")
 def sign_in(request: SignInRequest, db: Session = Depends(get_db)):
-    if request.auth_provider not in {'google', 'apple'}:
-        raise HTTPException(status_code=400, detail='استخدم تسجيل الدخول بالبريد أو Google أو Apple')
     if request.auth_provider == 'google':
         claims = _verify_google_token(request.id_token)
         stable_prefix = 'google'
@@ -245,8 +246,10 @@ def sign_in(request: SignInRequest, db: Session = Depends(get_db)):
         claims = _verify_apple_token(request.id_token)
         stable_prefix = 'apple'
     else:
+        if not settings.ALLOW_MANUAL_AUTH:
+            raise HTTPException(status_code=400, detail="Manual sign-in is disabled")
         claims = {}
-        stable_prefix = request.auth_provider or 'manual'
+        stable_prefix = 'manual'
     verified_email = claims.get('email') if claims else request.email
     verified_subject = claims.get('sub') if claims else request.auth_subject
     verified_name = claims.get('name') or request.name
@@ -264,13 +267,34 @@ def sign_in(request: SignInRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     result = _serialize(user)
-    result["access_token"] = _issue_token(user)
+    result["access_token"] = create_access_token(user)
     result["token_type"] = "bearer"
     return result
 
 
+@router.delete("/account", status_code=204)
+def delete_account(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Permanently delete the authenticated account and all owned learning data.
+
+    UserError has no ORM delete cascade in older database schemas, so it is
+    removed explicitly. Conversations are deleted through User's cascade,
+    which also removes their messages via Conversation.messages.
+    """
+    try:
+        db.query(UserError).filter(UserError.user_id == current_user.id).delete(
+            synchronize_session=False
+        )
+        db.delete(current_user)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="تعذر حذف الحساب نهائيًا") from exc
+    return None
+
+
 @router.get("/profile/{user_id}")
-def get_profile(user_id: str, db: Session = Depends(get_db)):
+def get_profile(user_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    enforce_owner(user_id, current_user)
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -278,7 +302,8 @@ def get_profile(user_id: str, db: Session = Depends(get_db)):
 
 
 @router.put("/profile")
-def update_profile(request: ProfileUpdateRequest, db: Session = Depends(get_db)):
+def update_profile(request: ProfileUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    enforce_owner(request.user_id, current_user)
     user = db.query(User).filter(User.user_id == request.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
