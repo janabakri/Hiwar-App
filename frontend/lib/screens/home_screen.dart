@@ -347,13 +347,17 @@ class _VoiceScreenState extends State<VoiceScreen> {
     voicePreference = await widget.api.getVoicePreference();
     await tts.setLanguage('en-US');
     // 0.45 felt noticeably slow in Chrome; keep a clear learner-friendly pace.
-    await tts.setSpeechRate(0.65);
+    await tts.setSpeechRate(0.78);
     await tts.setVolume(1.0);
+    await tts.awaitSpeakCompletion(false);
     await tts.setPitch(voicePreference == 'male' ? 0.82 : 1.08);
 
     try {
       final rawVoices = await tts.getVoices;
-      if (rawVoices is! List || rawVoices.isEmpty) return;
+      if (rawVoices is! List || rawVoices.isEmpty) {
+        ttsConfigured = true;
+        return;
+      }
       final preferredNames = voicePreference == 'male'
           ? ['david', 'alex', 'daniel', 'george', 'guy', 'male']
           : ['samantha', 'aria', 'jenny', 'zira', 'karen', 'female'];
@@ -396,9 +400,10 @@ class _VoiceScreenState extends State<VoiceScreen> {
     if (mounted) setState(() => status = 'المدرب يبدأ المحادثة...');
     try {
       await _configureTts();
-      await tts.awaitSpeakCompletion(true);
+      await tts.stop();
       if (!mounted) return;
-      await tts.speak(opening);
+      final result = await tts.speak(opening);
+      if (result == 0) throw StateError('TTS_FAILED');
       if (mounted && !listening && !sending) setState(() => status = 'اضغط للبدء بالحديث');
     } catch (_) {
       openingPlayed = false;
@@ -473,7 +478,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
         partialResults: true,
         cancelOnError: true,
         listenFor: const Duration(seconds: 60),
-        pauseFor: const Duration(seconds: 4),
+        pauseFor: const Duration(seconds: 2),
         onResult: (result) {
           if (!mounted) return;
           setState(() => transcript = result.recognizedWords);
@@ -502,7 +507,6 @@ class _VoiceScreenState extends State<VoiceScreen> {
     }
     try {
       await _configureTts();
-      await tts.awaitSpeakCompletion(true);
       await tts.stop();
       final result = await tts.speak(text);
       if (result == 0) throw StateError('TTS_FAILED');
@@ -519,7 +523,14 @@ class _VoiceScreenState extends State<VoiceScreen> {
       if (mounted) setState(() => status = 'حاول قول جملة قصيرة بالإنجليزي');
       return;
     }
-    setState(() { sending = true; submittedCurrent = true; status = 'يفكر بالرد...'; });
+    setState(() {
+      sending = true;
+      submittedCurrent = true;
+      analysisError = null;
+      analysisCompleted = false;
+      reply = '';
+      status = 'يفكر بالرد...';
+    });
     try {
       final token = await widget.api.getAccessToken();
       if (token == null || token.isEmpty) throw StateError('AUTH_MISSING');
@@ -547,9 +558,12 @@ class _VoiceScreenState extends State<VoiceScreen> {
       if (mounted) {
         final isUnauthorized = error is DioException && error.response?.statusCode == 401;
         final isMissingAuth = error is StateError && error.message == 'AUTH_MISSING';
+        final isTimeout = error is DioException && (error.type == DioExceptionType.connectionTimeout || error.type == DioExceptionType.sendTimeout || error.type == DioExceptionType.receiveTimeout);
         final message = isUnauthorized || isMissingAuth
             ? 'انتهت جلسة الدخول. سجّل الخروج ثم ادخل من جديد قبل بدء المحادثة.'
-            : 'تعذر الوصول إلى Backend على ${widget.api.baseUrl}. تحقق من تشغيل الخادم وAPI_BASE_URL ثم حاول مرة أخرى.';
+            : isTimeout
+                ? 'تأخر رد المدرب. تأكد أن Gemini مفعّل في Backend ثم حاول مرة أخرى.'
+                : 'تعذر الوصول إلى Backend على ${widget.api.baseUrl}. تحقق من تشغيل الخادم وAPI_BASE_URL ثم حاول مرة أخرى.';
         setState(() {
           sending = false;
           submittedCurrent = false;
@@ -600,11 +614,26 @@ class _VoiceScreenState extends State<VoiceScreen> {
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
           Column(children: [
-            const SizedBox(height: 60),
-            Text(status, style: ar(13.5, weight: FontWeight.w600, color: inkSoft)),
+            const SizedBox(height: 28),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _Card(
+                child: Row(
+                  children: [
+                    Icon(sending ? Icons.auto_awesome_outlined : listening ? Icons.hearing_outlined : Icons.mic_none_rounded, color: primary, size: 19),
+                    const SizedBox(width: 9),
+                    Expanded(child: Text(status, style: ar(13, weight: FontWeight.w600, color: inkSoft))),
+                    if (!openingPlayed && !listening && !sending)
+                      TextButton(
+                        onPressed: _speakOpening,
+                        child: Text('استمع للترحيب', style: ar(10.5, color: primary, weight: FontWeight.w700)),
+                      ),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 22),
             Container(
               width: 190,
@@ -685,7 +714,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
             Text(elapsed, style: mono(13, color: inkFaint)),
           ]),
           Padding(
-            padding: const EdgeInsets.only(bottom: 32),
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 32),
             child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
               Column(children: [IconButton(onPressed: toggleListening, icon: Icon(listening ? Icons.stop_rounded : Icons.mic_none, color: listening ? rust : ink), iconSize: 26, style: IconButton.styleFrom(backgroundColor: paper, side: const BorderSide(color: line), fixedSize: const Size(64, 64))), Text(listening ? 'إيقاف' : 'اضغط وتحدث', style: ar(11.5, color: inkFaint))]),
               const SizedBox(width: 34),
