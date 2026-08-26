@@ -1431,14 +1431,35 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
   bool get aiChoosesSkill => (widget.focusSkills ?? '').contains('ما أعرف');
 
   Future<void> submitReading(String answer) async {
-    answeredQuestions++;
-    score += answer.startsWith('Small') ? 1 : 0;
-    if (widget.api != null && widget.userId != null) {
-      try {
-        await widget.api!.assessReading(userId: widget.userId!, passage: 'Learning a language takes practice. Small daily conversations can help you become more confident and understand people from different cultures.', answer: answer);
-      } catch (_) {}
+    final isCorrect = answer.startsWith('Small');
+
+    // Move the learner forward immediately. The AI assessment is supplementary
+    // and must not block the next section of the level test.
+    if (mounted) {
+      setState(() {
+        answeredQuestions++;
+        if (isCorrect) score++;
+        section++;
+        question = 0;
+      });
     }
-    if (mounted) setState(() => section++);
+
+    if (widget.api != null && widget.userId != null) {
+      unawaited(_saveReadingAssessment(answer));
+    }
+  }
+
+  Future<void> _saveReadingAssessment(String answer) async {
+    try {
+      await widget.api!.assessReading(
+        userId: widget.userId!,
+        passage: 'Learning a language takes practice. Small daily conversations can help you become more confident and understand people from different cultures.',
+        answer: answer,
+      );
+    } catch (_) {
+      // The section transition is already complete; a failed background save
+      // should not trap the learner on Reading.
+    }
   }
 
   final grammar = <Map<String, Object>>[
@@ -1608,7 +1629,8 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
   }
 
   Widget _buildResultView() {
-    final percent = resultScore.clamp(0, 100);
+    final percent = resultScore.clamp(0, 100).toInt();
+    final progress = percent / 100.0;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 30),
       children: [
@@ -1632,7 +1654,7 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
                   width: 108,
                   height: 108,
                   child: CircularProgressIndicator(
-                    value: percent / 100,
+                    value: progress,
                     strokeWidth: 9,
                     backgroundColor: primaryTint,
                     color: primary,
