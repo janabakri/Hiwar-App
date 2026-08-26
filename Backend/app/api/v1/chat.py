@@ -224,7 +224,17 @@ def chat(
                 )
                 raw_output = response.choices[0].message.content or ""
 
-            parsed = _parse_json_object(raw_output)
+            try:
+                parsed = _parse_json_object(raw_output)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                # Gemini can occasionally return a natural-language answer even when
+                # JSON mode is requested. Keep the real answer rather than showing
+                # it as an error; corrections remain empty until structured output
+                # is available.
+                plain_reply = raw_output.strip()
+                if not plain_reply:
+                    raise
+                parsed = {"reply": plain_reply, "corrections": [], "tips": []}
             if isinstance(parsed.get("reply"), str) and parsed["reply"].strip():
                 reply = parsed["reply"].strip()
                 analysis_completed = True
@@ -242,8 +252,8 @@ def chat(
             ai_tips = [str(item) for item in parsed.get("tips", []) if item]
         except (json.JSONDecodeError, TypeError, ValueError) as exc:
             print(f"AI structured output error: {exc}")
-            analysis_message = 'لم يكتمل تحليل هذه الرسالة لأن مزود AI أعاد نتيجة غير مفهومة. حاول مرة أخرى.'
-            reply = analysis_message
+            analysis_message = 'لم يكتمل التحليل المنظم لهذه الرسالة، لكن يمكنك متابعة المحادثة. حاول مرة أخرى للحصول على التصحيحات.'
+            reply = ''
         except Exception as exc:
             # Do not expose provider keys, quota details, or stack traces to app users.
             print(f"AI chat provider error: {exc}")
@@ -258,10 +268,10 @@ def chat(
                 analysis_message = 'انتهت مهلة الاتصال بمزود AI. تحقق من الإنترنت ثم حاول مرة أخرى.'
             else:
                 analysis_message = 'لم يكتمل تحليل هذه الرسالة بسبب تعذر الوصول إلى مزود AI. تحقق من إعدادات Backend ثم أعد المحاولة.'
-            reply = analysis_message
+            reply = ''
     else:
         analysis_message = f'لم يكتمل تحليل هذه الرسالة لأن مزود {provider.upper()} غير مهيأ. تحقق من مفتاحه في Backend/.env ثم أعد تشغيل الخادم.'
-        reply = analysis_message
+        reply = ''
     
     # 5. Prepare corrections
     corrections = structured_corrections or [
