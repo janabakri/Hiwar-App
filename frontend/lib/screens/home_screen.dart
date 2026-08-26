@@ -90,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFEEEAE4),
+        backgroundColor: bg,
         body: SafeArea(child: pages[_index]),
         bottomNavigationBar: _BottomNav(index: _index, onTap: _open),
       ),
@@ -126,7 +126,7 @@ class _Card extends StatelessWidget {
   final Widget child; final EdgeInsets padding; final VoidCallback? onTap;
   const _Card({required this.child, this.padding = const EdgeInsets.all(16), this.onTap});
   @override
-  Widget build(BuildContext context) { final content = Container(padding: padding, decoration: BoxDecoration(color: paper, borderRadius: BorderRadius.circular(18), border: Border.all(color: line)), child: child); return onTap == null ? content : InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: content); }
+  Widget build(BuildContext context) { final content = Container(padding: padding, decoration: BoxDecoration(color: paper, borderRadius: BorderRadius.circular(18), border: Border.all(color: line), boxShadow: const [BoxShadow(color: Color(0x12000000), blurRadius: 14, offset: Offset(0, 5))]), child: child); return onTap == null ? content : InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: content); }
 }
 
 class _SectionTitle extends StatelessWidget { final String text; final String? tag; const _SectionTitle(this.text, {this.tag}); @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(top: 22, bottom: 10), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(text, style: ar(13, weight: FontWeight.w600, color: inkSoft)), if (tag != null) Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3), decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(20)), child: Text(tag!, style: ar(11, weight: FontWeight.w600, color: primary)))])); }
@@ -151,8 +151,8 @@ class _Ring extends StatelessWidget {
             height: 64,
             child: CircularProgressIndicator(
               value: progress,
-              strokeWidth: 6,
-              backgroundColor: primaryTint,
+              strokeWidth: 7,
+              backgroundColor: const Color(0xFFE0DCF0),
               color: primary,
             ),
           ),
