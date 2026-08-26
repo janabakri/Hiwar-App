@@ -138,7 +138,8 @@ class HiwarApi {
       : _dio = Dio(BaseOptions(
           baseUrl: _apiBaseUrl().replaceFirst(RegExp(r'/$'), ''),
           connectTimeout: const Duration(seconds: 8),
-          receiveTimeout: const Duration(seconds: 8),
+          sendTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 45),
           headers: {'Content-Type': 'application/json'},
         )) {
     _dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) async {
