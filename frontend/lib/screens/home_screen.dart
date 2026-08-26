@@ -38,7 +38,8 @@ TextStyle mono(double size, {FontWeight weight = FontWeight.w500, Color color = 
 class HomeScreen extends StatefulWidget {
   final HiwarProfile? profile;
   final Future<void> Function()? onSignOut;
-  const HomeScreen({super.key, this.profile, this.onSignOut});
+  final Future<void> Function()? onAccountDeleted;
+  const HomeScreen({super.key, this.profile, this.onSignOut, this.onAccountDeleted});
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -85,7 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       ExploreContent(),
       ProgressContent(profile: _profile, onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: _profile?.userId, focusSkills: _profile?.focusSkills, onComplete: _completeLevelCheck)))),
-      ProfileContent(api: _api, profile: _profile, onSignOut: widget.onSignOut),
+      ProfileContent(api: _api, profile: _profile, onSignOut: widget.onSignOut, onAccountDeleted: widget.onAccountDeleted),
     ];
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -930,7 +931,8 @@ class ProfileContent extends StatefulWidget {
   final HiwarApi api;
   final HiwarProfile? profile;
   final Future<void> Function()? onSignOut;
-  const ProfileContent({super.key, required this.api, this.profile, this.onSignOut});
+  final Future<void> Function()? onAccountDeleted;
+  const ProfileContent({super.key, required this.api, this.profile, this.onSignOut, this.onAccountDeleted});
   @override State<ProfileContent> createState() => _ProfileContentState();
 }
 
@@ -1020,6 +1022,55 @@ class _ProfileContentState extends State<ProfileContent> {
       MaterialPageRoute(builder: (_) => ProfileEditScreen(api: widget.api, profile: current)),
     );
     if (updated != null && mounted) setState(() => editedProfile = updated);
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    final confirmation = TextEditingController();
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: Text('حذف الحساب نهائيًا', style: ar(17, weight: FontWeight.w800, color: rust)),
+            content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('سيتم حذف حسابك وجميع المحادثات والرسائل والأخطاء ونتائج التدريب من قاعدة البيانات. لا يمكن التراجع عن هذا الإجراء.', style: ar(13, color: inkSoft)),
+              const SizedBox(height: 14),
+              Text('اكتب «حذف» للتأكيد', style: ar(12, weight: FontWeight.w700, color: ink)),
+              const SizedBox(height: 7),
+              TextField(controller: confirmation, autofocus: true, textDirection: TextDirection.rtl, decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'حذف')),
+            ]),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text('إلغاء', style: ar(13, weight: FontWeight.w700, color: inkSoft))),
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: confirmation,
+                builder: (_, value, __) => FilledButton(
+                  onPressed: value.text.trim() == 'حذف' ? () => Navigator.pop(dialogContext, true) : null,
+                  style: FilledButton.styleFrom(backgroundColor: rust, foregroundColor: Colors.white),
+                  child: Text('حذف نهائيًا', style: ar(13, weight: FontWeight.w700, color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      setState(() => loading = true);
+      try {
+        await widget.api.deleteAccount();
+        final onAccountDeleted = widget.onAccountDeleted;
+        if (onAccountDeleted != null) await onAccountDeleted();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف الحساب نهائيًا.')));
+      } catch (_) {
+        if (mounted) {
+          setState(() => loading = false);
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر حذف الحساب. لم يتم مسح أي بيانات، حاول مرة أخرى.')));
+        }
+      }
+    } finally {
+      confirmation.dispose();
+    }
   }
 
   Future<void> _confirmSignOut() async {
@@ -1119,25 +1170,31 @@ class _ProfileContentState extends State<ProfileContent> {
       if (!loading && error != null) Padding(padding: const EdgeInsets.only(top: 16), child: Text('تعذر تحميل الإحصاءات: $error', style: ar(11, color: rust))),
       const SizedBox(height: 26),
       _Card(
-        child: SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: _confirmSignOut,
-            icon: const Icon(Icons.logout_rounded, color: rust, size: 19),
-            label: Text(
-              'تسجيل الخروج',
-              style: ar(13.5, weight: FontWeight.w700, color: rust),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: rust,
-              side: const BorderSide(color: Color(0xFFE8BFC3)),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+        child: Column(children: [
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _confirmSignOut,
+              icon: const Icon(Icons.logout_rounded, color: rust, size: 19),
+              label: Text('تسجيل الخروج', style: ar(13.5, weight: FontWeight.w700, color: rust)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: rust,
+                side: const BorderSide(color: Color(0xFFE8BFC3)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
             ),
           ),
-        ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton.icon(
+              onPressed: _confirmDeleteAccount,
+              icon: const Icon(Icons.delete_outline_rounded, color: rust, size: 18),
+              label: Text('حذف الحساب نهائيًا', style: ar(12.5, weight: FontWeight.w700, color: rust)),
+            ),
+          ),
+        ]),
       ),
     ]);
   }

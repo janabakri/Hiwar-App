@@ -186,6 +186,13 @@ class HiwarApi {
     await prefs.remove('hiwar_user_id');
   }
 
+  /// Permanently deletes the authenticated account on the server.
+  /// Local credentials are cleared only after Dio receives a successful response.
+  Future<void> deleteAccount() async {
+    await _dio.delete('/api/v1/account');
+    await signOut();
+  }
+
   Future<String> getVoicePreference() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('hiwar_voice_preference') ?? 'female';
