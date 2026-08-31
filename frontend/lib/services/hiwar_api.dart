@@ -101,6 +101,28 @@ class HiwarError {
   );
 }
 
+class HiwarJournalResult {
+  final int id;
+  final String originalText;
+  final String correctedText;
+  final String followUpQuestion;
+  final List<Map<String, String>> corrections;
+
+  const HiwarJournalResult({required this.id, required this.originalText, required this.correctedText, required this.followUpQuestion, required this.corrections});
+
+  factory HiwarJournalResult.fromJson(Map<String, dynamic> json) => HiwarJournalResult(
+    id: (json['id'] as num?)?.toInt() ?? 0,
+    originalText: '${json['original_text'] ?? ''}',
+    correctedText: '${json['corrected_text'] ?? ''}',
+    followUpQuestion: '${json['follow_up_question'] ?? ''}',
+    corrections: ((json['corrections'] as List?) ?? const []).whereType<Map>().map((item) => <String, String>{
+      'wrong': '${item['wrong'] ?? ''}',
+      'correct': '${item['correct'] ?? ''}',
+      'explanation': '${item['explanation'] ?? ''}',
+    }).toList(),
+  );
+}
+
 class HiwarChatResult {
   final String reply;
   final List<Map<String, String>> corrections;
@@ -191,6 +213,29 @@ class HiwarApi {
   Future<void> deleteAccount() async {
     await _dio.delete('/api/v1/account');
     await signOut();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('hiwar_voice_timeline');
+    await prefs.remove('hiwar_voice_preference');
+  }
+
+  Future<void> saveVoiceTimelineEntry({required String text, required int durationSeconds}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final entries = prefs.getStringList('hiwar_voice_timeline') ?? <String>[];
+    final stamp = DateTime.now().toIso8601String();
+    entries.add('$stamp|$durationSeconds|${text.replaceAll('|', ' ')}');
+    await prefs.setStringList('hiwar_voice_timeline', entries.take(20).toList());
+  }
+
+  Future<List<Map<String, String>>> getVoiceTimeline() async {
+    final prefs = await SharedPreferences.getInstance();
+    return (prefs.getStringList('hiwar_voice_timeline') ?? const <String>[]).map((entry) {
+      final parts = entry.split('|');
+      return <String, String>{
+        'date': parts.isNotEmpty ? parts[0] : '',
+        'duration': parts.length > 1 ? parts[1] : '0',
+        'text': parts.length > 2 ? parts.sublist(2).join('|') : '',
+      };
+    }).where((entry) => (entry['text'] ?? '').trim().isNotEmpty).toList().reversed.toList();
   }
 
   Future<String> getVoicePreference() async {
@@ -244,13 +289,25 @@ class HiwarApi {
     return ((data['errors'] as List?) ?? const []).map((item) => HiwarError.fromJson(Map<String, dynamic>.from(item as Map))).toList();
   }
 
-  Future<HiwarChatResult> sendChat({required String userId, required String message, int? conversationId}) async {
+  Future<HiwarChatResult> sendChat({required String userId, required String message, int? conversationId, String? tutorInstruction}) async {
     final response = await _dio.post('/api/v1/chat', data: {
       'message': message,
       'user_id': userId,
       if (conversationId != null) 'conversation_id': conversationId,
+      if (tutorInstruction != null && tutorInstruction.trim().isNotEmpty) 'tutor_instruction': tutorInstruction.trim(),
     });
     return HiwarChatResult.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<HiwarJournalResult> analyzeJournal({required String userId, required String text}) async {
+    final response = await _dio.post('/api/v1/journal/analyze', data: {'user_id': userId, 'text': text});
+    return HiwarJournalResult.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<List<Map<String, dynamic>>> getJournal(String userId) async {
+    final response = await _dio.get('/api/v1/journal/${Uri.encodeComponent(userId)}');
+    final data = Map<String, dynamic>.from(response.data as Map);
+    return ((data['entries'] as List?) ?? const []).whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
   }
 
   Future<HiwarProfile> getProfile(String userId) async {

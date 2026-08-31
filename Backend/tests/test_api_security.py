@@ -16,6 +16,7 @@ from app.main import app
 from app.models.user import User
 from app.models.conversation import Conversation, Message
 from app.models.error import UserError
+from app.models.journal import JournalEntry
 from app.api.v1.profile import _verification_digest
 
 
@@ -98,6 +99,7 @@ def test_delete_account_removes_only_owned_data():
         conversation.messages.append(Message(role="user", content="Hello"))
         db.add(conversation)
         db.add(UserError(user_id=owner.id, error_type="grammar", wrong_text="I go", correct_text="I went"))
+        db.add(JournalEntry(user_id=owner.id, original_text="I go yesterday", corrected_text="I went yesterday", follow_up_question="What did you do next?"))
         db.commit()
 
     response = client.delete(
@@ -112,6 +114,7 @@ def test_delete_account_removes_only_owned_data():
         assert db.query(Conversation).count() == 0
         assert db.query(Message).count() == 0
         assert db.query(UserError).count() == 0
+        assert db.query(JournalEntry).count() == 0
         assert db.query(User).filter(User.user_id == other["user_id"]).count() == 1
 
 
