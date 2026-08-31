@@ -65,8 +65,8 @@ class _AuthScreenState extends State<AuthScreen> {
       final profile = await widget.api.signIn(userId: account.id, name: account.displayName ?? account.email.split('@').first, email: account.email, provider: 'google', subject: account.id, idToken: idToken);
       await widget.api.saveUserId(profile.userId);
       if (mounted) widget.onSignedIn(profile);
-    } catch (_) {
-      if (mounted) setState(() { busy = false; error = 'لم يكتمل تسجيل Google. تحقق من إعداد OAuth أو استخدم Sign up.'; });
+    } on Exception catch (e) {
+      if (mounted) setState(() { busy = false; error = HiwarApi.describeError(e); });
     }
   }
 
@@ -97,14 +97,14 @@ class _AuthScreenState extends State<AuthScreen> {
       );
       await widget.api.saveUserId(profile.userId);
       if (mounted) widget.onSignedIn(profile);
-    } catch (_) {
-      if (mounted) setState(() { busy = false; error = 'لم يكتمل تسجيل Apple. تأكد من إعداد Sign in with Apple في Apple Developer وجرّب على iPhone.'; });
+    } on Exception catch (e) {
+      if (mounted) setState(() { busy = false; error = HiwarApi.describeError(e); });
     }
   }
 
   Future<void> _manualSignIn() async {
-    if (email.text.trim().isEmpty || password.text.length < 8) {
-      setState(() => error = 'أدخل البريد وكلمة المرور الصحيحة.');
+    if (!HiwarApi.isValidEmail(email.text) || password.text.length < 8) {
+      setState(() => error = 'أدخل بريدًا صحيحًا وكلمة مرور من 8 أحرف على الأقل.');
       return;
     }
     setState(() { busy = true; error = null; });
@@ -112,14 +112,18 @@ class _AuthScreenState extends State<AuthScreen> {
       final profile = await widget.api.passwordSignIn(email: email.text.trim(), password: password.text);
       await widget.api.saveUserId(profile.userId);
       if (mounted) widget.onSignedIn(profile);
-    } catch (_) {
-      if (mounted) setState(() { busy = false; error = 'البريد أو كلمة المرور غير صحيحة، أو لم يتم تفعيل البريد.'; });
+    } on Exception catch (e) {
+      if (mounted) setState(() { busy = false; error = 'تعذر الدخول: ${HiwarApi.describeError(e)}'; });
     }
   }
 
   Future<void> _requestSignupCode() async {
-    if (name.text.trim().isEmpty || email.text.trim().isEmpty || password.text.length < 8) {
-      setState(() => error = 'أدخل الاسم والبريد وكلمة مرور من 8 أحرف على الأقل.');
+    if (name.text.trim().isEmpty || password.text.length < 8) {
+      setState(() => error = 'أدخل الاسم وكلمة مرور من 8 أحرف على الأقل.');
+      return;
+    }
+    if (!HiwarApi.isValidEmail(email.text)) {
+      setState(() => error = 'صيغة البريد غير صحيحة. مثال: name@gmail.com');
       return;
     }
     setState(() { busy = true; error = null; });
@@ -127,8 +131,8 @@ class _AuthScreenState extends State<AuthScreen> {
       final result = await widget.api.signUp(name: name.text.trim(), email: email.text.trim(), password: password.text);
       final sent = result['sent'] == true;
       if (mounted) setState(() { busy = false; waitingForCode = sent; error = sent ? null : 'تعذر إرسال رمز التحقق. حاول مرة أخرى.'; });
-    } catch (_) {
-      if (mounted) setState(() { busy = false; error = 'تعذر إنشاء الحساب. حاول مرة أخرى أو استخدم بريدًا مختلفًا.'; });
+    } on Exception catch (e) {
+      if (mounted) setState(() { busy = false; error = 'تعذر إنشاء الحساب: ${HiwarApi.describeError(e)}'; });
     }
   }
 
@@ -142,8 +146,8 @@ class _AuthScreenState extends State<AuthScreen> {
       final profile = await widget.api.verifyEmail(email: email.text.trim(), code: code.text.trim());
       await widget.api.saveUserId(profile.userId);
       if (mounted) widget.onSignedIn(profile);
-    } catch (_) {
-      if (mounted) setState(() { busy = false; error = 'الرمز غير صحيح أو منتهي. استخدم آخر رمز وصلك وتأكد من البريد المستخدم.'; });
+    } on Exception catch (e) {
+      if (mounted) setState(() { busy = false; error = 'الرمز غير صحيح: ${HiwarApi.describeError(e)}'; });
     }
   }
 

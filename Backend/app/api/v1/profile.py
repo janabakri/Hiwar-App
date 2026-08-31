@@ -32,7 +32,21 @@ except ImportError:
     google_id_token = None
     google_requests = None
 
+import re
+
 router = APIRouter()
+
+# Reasonable email format check: rejects placeholder domains like example.com,
+# missing '@', spaces, and clearly malformed addresses before we try to send mail.
+_EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
+_RESERVED_DOMAINS = {"example.com", "example.org", "example.net", "test.com", "localhost"}
+
+
+def _validate_email(email: str) -> str:
+    normalized = email.strip().lower()
+    if not _EMAIL_RE.match(normalized) or normalized.split('@')[1] in _RESERVED_DOMAINS:
+        raise HTTPException(status_code=422, detail="صيغة البريد الإلكتروني غير صحيحة. تأكدي من كتابته بشكل صحيح مثل: name@gmail.com")
+    return normalized
 
 
 class SignInRequest(BaseModel):
@@ -137,7 +151,10 @@ def _send_verification_email(email: str, code: str) -> bool:
         return False
     message = EmailMessage()
     message['Subject'] = 'رمز التحقق من حوار App'
-    sender_email = settings.SMTP_FROM or settings.SMTP_USERNAME
+    # From must be a valid email address or the SMTP server rejects the message.
+    sender_email = settings.SMTP_USERNAME or settings.SMTP_FROM
+    if '@' not in (sender_email or ''):
+        raise ValueError('SMTP_FROM/SMTP_USERNAME must be a valid email address')
     message['From'] = formataddr((settings.SMTP_FROM_NAME, sender_email))
     message['To'] = email
     message.set_content(f'رمز التحقق الخاص بك في حوار App هو: {code}\n\nينتهي الرمز خلال 10 دقائق. إذا طلبت رمزًا جديدًا، استخدم آخر رمز وصلك فقط.')
@@ -174,7 +191,7 @@ def _serialize(user: User):
 
 @router.post("/auth/sign-up")
 def sign_up(request: SignUpRequest, db: Session = Depends(get_db)):
-    email = request.email.strip().lower()
+    email = _validate_email(request.email)
     user = db.query(User).filter(User.email == email).first()
     if user and user.email_verified:
         raise HTTPException(status_code=409, detail="هذا البريد مسجل مسبقًا")
@@ -202,7 +219,7 @@ def sign_up(request: SignUpRequest, db: Session = Depends(get_db)):
 
 @router.post("/auth/verify-email")
 def verify_email(request: VerifyEmailRequest, db: Session = Depends(get_db)):
-    email = request.email.strip().lower()
+    email = _validate_email(request.email)
     code = _normalize_verification_code(request.code)
     user = db.query(User).filter(User.email == email).first()
     expected = _verification_digest(email, code)
@@ -222,7 +239,7 @@ def verify_email(request: VerifyEmailRequest, db: Session = Depends(get_db)):
 
 @router.post("/auth/password-sign-in")
 def password_sign_in(request: PasswordSignInRequest, db: Session = Depends(get_db)):
-    email = request.email.strip().lower()
+    email = _validate_email(request.email)
     user = db.query(User).filter(User.email == email).first()
     if not user or not user.password_hash or not _verify_password(request.password, user.password_hash):
         raise HTTPException(status_code=401, detail="البريد أو كلمة المرور غير صحيحة")

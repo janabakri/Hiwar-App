@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tests for chat endpoint.
 """
 
@@ -18,7 +18,7 @@ from app.core.database import Base
 
 # إعداد قاعدة بيانات وهمية للاختبار
 @pytest.fixture
-def test_db():
+async def test_db():
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     Base.metadata.create_all(bind=engine)
     
@@ -31,11 +31,10 @@ def test_db():
     Base.metadata.drop_all(bind=engine)
 
 
-@pytest.mark.asyncio
 async def test_chat_falls_back_when_openai_key_missing(monkeypatch, test_db):
     monkeypatch.setattr(settings, "OPENAI_API_KEY", "")
 
-    response = await chat(
+    response = chat(
         ChatMessage(message="I am go to school", user_id="user123"),
         db=test_db,
     )
@@ -44,3 +43,7 @@ async def test_chat_falls_back_when_openai_key_missing(monkeypatch, test_db):
     assert response.corrections
     assert response.corrections[0]["correct"] == "I am going"
     assert response.tips
+
+
+
+

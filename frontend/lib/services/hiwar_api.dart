@@ -177,6 +177,39 @@ class HiwarApi {
   final Dio _dio;
   static const _secureStorage = FlutterSecureStorage();
 
+  /// Quick client-side email sanity check so obvious typos (or placeholder
+  /// addresses like example.com) never reach the server / SMTP.
+  static bool isValidEmail(String email) {
+    final value = email.trim().toLowerCase();
+    final re = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
+    if (!re.hasMatch(value)) return false;
+    const reserved = {'example.com', 'example.org', 'example.net', 'test.com', 'localhost'};
+    return !reserved.contains(value.split('@').last);
+  }
+
+  /// Extracts the most useful message from a failed API call so the UI can
+  /// show the real reason (e.g. "verify your email first") instead of hiding it.
+  static String describeError(Object error) {
+    if (error is DioException) {
+      final data = error.response?.data;
+      if (data is Map && data['detail'] != null) return '${data['detail']}';
+      if (data is String && data.trim().isNotEmpty) return data.trim();
+      switch (error.type) {
+        case DioExceptionType.connectionTimeout:
+        case DioExceptionType.sendTimeout:
+        case DioExceptionType.receiveTimeout:
+          return 'انتهت مهلة الاتصال بالخادم. تأكدي من تشغيل الـ Backend.';
+        case DioExceptionType.connectionError:
+          return 'لا يمكن الوصول إلى الخادم (${error.requestOptions.uri.host}). تأكدي من تشغيل الـ Backend وAPI_BASE_URL.';
+        default:
+          break;
+      }
+      final code = error.response?.statusCode;
+      if (code != null) return 'خطأ من الخادم (رمز $code)';
+    }
+    return error.toString();
+  }
+
   static String _apiBaseUrl() {
     final configured = dotenv.isInitialized ? dotenv.env['API_BASE_URL'] : null;
     if (configured != null && configured.trim().isNotEmpty) return configured.trim();

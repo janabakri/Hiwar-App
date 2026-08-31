@@ -1,4 +1,4 @@
-"""Integration tests for authentication, authorization, and chat ownership."""
+﻿"""Integration tests for authentication, authorization, and chat ownership."""
 
 from pathlib import Path
 import sys
@@ -64,8 +64,8 @@ def test_protected_endpoint_requires_token():
 
 def test_user_cannot_read_or_write_another_profile():
     client, sessions = _client()
-    first = _register(client, sessions, "one@example.com")
-    second = _register(client, sessions, "two@example.com")
+    first = _register(client, sessions, "one@gmail.com")
+    second = _register(client, sessions, "two@gmail.com")
     headers = {"Authorization": f"Bearer {first['access_token']}"}
     assert client.get(f"/api/v1/profile/{second['user_id']}", headers=headers).status_code == 403
     assert client.put("/api/v1/profile", headers=headers, json={
@@ -75,7 +75,7 @@ def test_user_cannot_read_or_write_another_profile():
 
 def test_authenticated_chat_persists_only_for_owner():
     client, sessions = _client()
-    account = _register(client, sessions, "chat@example.com")
+    account = _register(client, sessions, "chat@gmail.com")
     headers = {"Authorization": f"Bearer {account['access_token']}"}
     response = client.post("/api/v1/chat", headers=headers, json={
         "user_id": account["user_id"], "message": "I am go to school"
@@ -90,8 +90,8 @@ def test_authenticated_chat_persists_only_for_owner():
 
 def test_delete_account_removes_only_owned_data():
     client, sessions = _client()
-    account = _register(client, sessions, "delete@example.com")
-    other = _register(client, sessions, "keep@example.com")
+    account = _register(client, sessions, "delete@gmail.com")
+    other = _register(client, sessions, "keep@gmail.com")
 
     with sessions() as db:
         owner = db.query(User).filter(User.user_id == account["user_id"]).one()
@@ -125,3 +125,4 @@ def test_manual_sign_in_is_disabled_by_default():
         "user_id": "spoofed", "name": "Spoofed", "auth_provider": "manual"
     })
     assert response.status_code == 400
+

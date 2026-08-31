@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tests for the error tracking service.
 Tests the error detection patterns and logic.
 """
@@ -148,3 +148,4 @@ class TestErrorDetection:
             for key in required_keys:
                 assert key in error_def
                 assert error_def[key] is not None
+
