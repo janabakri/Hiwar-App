@@ -31,3 +31,4 @@ class UserError(Base):
     
     # Relationship
     user = relationship("User", back_populates="errors")
+
