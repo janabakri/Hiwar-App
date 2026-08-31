@@ -75,6 +75,10 @@ class _AuthGateState extends State<AuthGate> {
     if (mounted) setState(() { profile = null; needsLevelCheck = false; });
   }
 
+  Future<void> _onAccountDeleted() async {
+    if (mounted) setState(() { profile = null; needsLevelCheck = false; });
+  }
+
   void _signedIn(HiwarProfile next) => setState(() { profile = next; needsLevelCheck = _needsLevel(next); });
 
   void _onOnboardingComplete(HiwarProfile next) => setState(() { profile = next; needsLevelCheck = _needsLevel(next); });
@@ -98,7 +102,7 @@ class _AuthGateState extends State<AuthGate> {
     if (profile == null) return AuthScreen(api: api, onSignedIn: _signedIn);
     if (!profile!.profileComplete) return OnboardingScreen(api: api, profile: profile!, onComplete: _onOnboardingComplete);
     if (needsLevelCheck) return LevelCheckScreen(api: api, userId: profile!.userId, focusSkills: profile!.focusSkills, onComplete: _onLevelComplete);
-    return HomeScreen(profile: profile, onSignOut: _onSignedOut);
+    return HomeScreen(profile: profile, onSignOut: _onSignedOut, onAccountDeleted: _onAccountDeleted);
   }
 }
 

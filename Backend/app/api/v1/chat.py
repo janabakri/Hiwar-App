@@ -87,6 +87,7 @@ class ChatMessage(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
     user_id: str = Field(min_length=1, max_length=50)
     conversation_id: Optional[int] = None
+    tutor_instruction: Optional[str] = Field(default=None, max_length=300)
 
 
 class ChatResponse(BaseModel):
@@ -188,6 +189,7 @@ def chat(
     Recent conversation context (oldest to newest): {context_messages}
     Learner message: {request.message}
     New errors found in this message: {fresh_errors}
+    Extra learner request for this turn: {request.tutor_instruction or 'none'}
 
     Requirements:
     1. Reply naturally at the learner's demonstrated level.

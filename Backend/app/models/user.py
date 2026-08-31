@@ -6,6 +6,7 @@ from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from ..core.database import Base
+from .journal import JournalEntry  # noqa: F401  # register relationship target
 
 class User(Base):
     __tablename__ = "users"
@@ -48,3 +49,4 @@ class User(Base):
     # Relationships
     errors = relationship("UserError", back_populates="user")
     conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
+    journal_entries = relationship("JournalEntry", back_populates="user", cascade="all, delete-orphan")

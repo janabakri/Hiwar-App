@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:video_player/video_player.dart';
+import 'package:share_plus/share_plus.dart';
 import '../services/hiwar_api.dart';
 
 const bg = Color(0xFFF6F3EF);
@@ -38,7 +39,8 @@ TextStyle mono(double size, {FontWeight weight = FontWeight.w500, Color color = 
 class HomeScreen extends StatefulWidget {
   final HiwarProfile? profile;
   final Future<void> Function()? onSignOut;
-  const HomeScreen({super.key, this.profile, this.onSignOut});
+  final Future<void> Function()? onAccountDeleted;
+  const HomeScreen({super.key, this.profile, this.onSignOut, this.onAccountDeleted});
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -83,9 +85,9 @@ class _HomeScreenState extends State<HomeScreen> {
         onVoice: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => VoiceScreen(api: _api))),
         onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: _profile?.userId, focusSkills: _profile?.focusSkills, onComplete: _completeLevelCheck))),
       ),
-      ExploreContent(),
-      ProgressContent(profile: _profile, onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: _profile?.userId, focusSkills: _profile?.focusSkills, onComplete: _completeLevelCheck)))),
-      ProfileContent(api: _api, profile: _profile, onSignOut: widget.onSignOut),
+      ExploreContent(api: _api, profile: _profile),
+      ProgressContent(api: _api, profile: _profile, onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: _profile?.userId, focusSkills: _profile?.focusSkills, onComplete: _completeLevelCheck)))),
+      ProfileContent(api: _api, profile: _profile, onSignOut: widget.onSignOut, onAccountDeleted: widget.onAccountDeleted),
     ];
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -302,7 +304,8 @@ class _MistakeChip extends StatelessWidget { final String wrong, correct, catego
 
 class VoiceScreen extends StatefulWidget {
   final HiwarApi api;
-  const VoiceScreen({super.key, required this.api});
+  final String? initialPrompt;
+  const VoiceScreen({super.key, required this.api, this.initialPrompt});
 
   @override
   State<VoiceScreen> createState() => _VoiceScreenState();
@@ -330,6 +333,8 @@ class _VoiceScreenState extends State<VoiceScreen> {
   bool openingPlayed = false;
   bool ttsConfigured = false;
   String voicePreference = 'female';
+  double speechRate = 0.78;
+  String? tutorInstruction;
   late final Map<String, String> sessionTopic = _conversationTopics[Random().nextInt(_conversationTopics.length)];
 
   @override
@@ -347,7 +352,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
     voicePreference = await widget.api.getVoicePreference();
     await tts.setLanguage('en-US');
     // 0.45 felt noticeably slow in Chrome; keep a clear learner-friendly pace.
-    await tts.setSpeechRate(0.78);
+    await tts.setSpeechRate(speechRate);
     await tts.setVolume(1.0);
     await tts.awaitSpeakCompletion(false);
     await tts.setPitch(voicePreference == 'male' ? 0.82 : 1.08);
@@ -389,7 +394,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
   Future<void> _speakOpening() async {
     if (openingPlayed) return;
     openingPlayed = true;
-    final opening = switch (sessionTopic['title']) {
+    final opening = widget.initialPrompt?.trim().isNotEmpty == true ? widget.initialPrompt!.trim() : switch (sessionTopic['title']) {
       'Daily life' => 'Hi! Let\'s talk about your day. What was the best part of it?',
       'Travel' => 'Hi! Let\'s talk about travel. Where would you love to go next?',
       'Work & goals' => 'Hi! Let\'s talk about your goals. What are you working toward right now?',
@@ -499,6 +504,17 @@ class _VoiceScreenState extends State<VoiceScreen> {
     }
   }
 
+  Future<void> _setTutorHelp(String? instruction) async {
+    setState(() {
+      tutorInstruction = instruction;
+      speechRate = instruction == 'Speak more slowly and use shorter sentences.' ? 0.58 : 0.78;
+      status = instruction == null ? 'وضع المحادثة الطبيعي' : instruction.startsWith('Speak') ? 'سأتحدث ببطء أكثر' : 'سأبسط شرحي لك';
+    });
+    try {
+      await _configureTts(force: true);
+    } catch (_) {}
+  }
+
   Future<void> _speakReply() async {
     final text = reply.trim();
     if (text.isEmpty || !analysisCompleted) {
@@ -535,7 +551,8 @@ class _VoiceScreenState extends State<VoiceScreen> {
       final token = await widget.api.getAccessToken();
       if (token == null || token.isEmpty) throw StateError('AUTH_MISSING');
       final userId = await widget.api.getStoredUserId() ?? await widget.api.getUserId();
-      final result = await widget.api.sendChat(userId: userId, message: message, conversationId: conversationId);
+      await widget.api.saveVoiceTimelineEntry(text: message, durationSeconds: seconds);
+      final result = await widget.api.sendChat(userId: userId, message: message, conversationId: conversationId, tutorInstruction: tutorInstruction);
       if (!mounted) return;
       setState(() {
         conversationId ??= result.conversationId;
@@ -710,6 +727,14 @@ class _VoiceScreenState extends State<VoiceScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Wrap(alignment: WrapAlignment.center, spacing: 8, runSpacing: 6, children: [
+                ChoiceChip(label: Text('بطّئ لي', style: ar(11, color: tutorInstruction != null && speechRate < 0.7 ? primary : inkSoft)), selected: tutorInstruction != null && speechRate < 0.7, onSelected: sending ? null : (_) => _setTutorHelp(tutorInstruction != null && speechRate < 0.7 ? null : 'Speak more slowly and use shorter sentences.'), avatar: const Icon(Icons.slow_motion_video_outlined, size: 15)),
+                ChoiceChip(label: Text('بسّطها لي', style: ar(11, color: tutorInstruction != null && speechRate >= 0.7 ? primary : inkSoft)), selected: tutorInstruction != null && speechRate >= 0.7, onSelected: sending ? null : (_) => _setTutorHelp(tutorInstruction == 'Use simpler English and explain your last reply in one short sentence.' ? null : 'Use simpler English and explain your last reply in one short sentence.'), avatar: const Icon(Icons.translate_outlined, size: 15)),
+              ]),
+            ),
             const SizedBox(height: 8),
             Text(elapsed, style: mono(13, color: inkFaint)),
           ]),
@@ -866,6 +891,10 @@ class _WordChip extends StatelessWidget {
 }
 
 class ExploreContent extends StatelessWidget {
+  final HiwarApi api;
+  final HiwarProfile? profile;
+  const ExploreContent({super.key, required this.api, this.profile});
+
   @override
   Widget build(BuildContext context) => ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 28), children: [
     const _SectionTitle('استكشف'),
@@ -874,8 +903,13 @@ class ExploreContent extends StatelessWidget {
       const SizedBox(width: 8),
       _SparkleArt(),
     ])),
+        const SizedBox(height: 16),
+    _Card(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => JournalScreen(api: api))), child: Row(children: [Container(width: 46, height: 46, decoration: BoxDecoration(color: coralTint, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.edit_note_rounded, color: Color(0xFFB5451A))), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('يومياتك بالإنجليزي', style: ar(14, weight: FontWeight.w700)), Text('اكتب عن يومك وحوّل كلامك إلى محادثة', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left_rounded, color: inkFaint)])),
+    const SizedBox(height: 12),
+    _Card(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GoalPacksScreen(api: api))), child: Row(children: [Container(width: 46, height: 46, decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.flag_outlined, color: primary)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('استعد لهدف قريب', style: ar(14, weight: FontWeight.w700)), Text('خطط قصيرة للسفر ومقابلة العمل وIELTS', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left_rounded, color: inkFaint)])),
     const SizedBox(height: 16),
-    GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1.05, children: [_Skill(title: 'التحدث', english: 'Speaking', value: 70, color: primaryTint), _Skill(title: 'الاستماع', english: 'Listening', value: 55, color: const Color(0xFFE7EEF7)), _Skill(title: 'القراءة', english: 'Reading', value: 48, color: const Color(0xFFF7EEDB)), _Skill(title: 'الكتابة', english: 'Writing', value: 40, color: const Color(0xFFF6E6EB)), _Skill(title: 'القواعد', english: 'Grammar', value: 58, color: const Color(0xFFE9E7F2)), _Skill(title: 'المفردات', english: 'Vocabulary', value: 65, color: const Color(0xFFF8E7E6))],),
+    GridView.count(shrinkWrap: true,
+ physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1.05, children: [_Skill(title: 'التحدث', english: 'Speaking', value: 70, color: primaryTint), _Skill(title: 'الاستماع', english: 'Listening', value: 55, color: const Color(0xFFE7EEF7)), _Skill(title: 'القراءة', english: 'Reading', value: 48, color: const Color(0xFFF7EEDB)), _Skill(title: 'الكتابة', english: 'Writing', value: 40, color: const Color(0xFFF6E6EB)), _Skill(title: 'القواعد', english: 'Grammar', value: 58, color: const Color(0xFFE9E7F2)), _Skill(title: 'المفردات', english: 'Vocabulary', value: 65, color: const Color(0xFFF8E7E6))],),
   ]);
 }
 class _Skill extends StatelessWidget {
@@ -907,9 +941,10 @@ class _Skill extends StatelessWidget {
 }
 
 class ProgressContent extends StatelessWidget {
+  final HiwarApi api;
   final HiwarProfile? profile;
   final VoidCallback? onLevelCheck;
-  const ProgressContent({super.key, this.profile, this.onLevelCheck});
+  const ProgressContent({super.key, required this.api, this.profile, this.onLevelCheck});
   @override
   Widget build(BuildContext context) {
     final score = profile?.levelScore ?? 0;
@@ -918,8 +953,16 @@ class ProgressContent extends StatelessWidget {
     return ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 28), children: [
     const _SectionTitle('تقدّم'),
     _Card(child: Row(children: [_Ring(value: score > 0 ? '$score%' : '—', label: 'المستوى'), const SizedBox(width: 16), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(level, style: ar(14.5, weight: FontWeight.w700)), Text(days == 0 ? 'ابدأ أول جلسة لك' : 'عضو منذ $days يوم', style: ar(12, color: inkFaint))])])),
-    const SizedBox(height: 14),
-    _Card(onTap: onLevelCheck, child: Row(children: [const _LevelMeterArt(size: 58), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('حدد مستواك من جديد', style: ar(14, weight: FontWeight.w700)), Text('اختبار قصير يعطيك مسارًا أدق', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left, color: inkFaint)])),
+        const SizedBox(height: 14),
+    _Card(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => VoiceTimelineScreen(api: api))), child: Row(children: [Container(width: 46, height: 46, decoration: BoxDecoration(color: coralTint, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.graphic_eq_rounded, color: Color(0xFFB5451A))), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('اسمع تطورك', style: ar(14, weight: FontWeight.w700)), Text('قارن آخر محادثة بأول خطوة لك', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left_rounded, color: inkFaint)])),
+    const SizedBox(height: 12),
+        _Card(onTap: onLevelCheck,
+	 child: Row(children: [const _LevelMeterArt(size: 58), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('حدد مستواك من جديد', style: ar(14, weight: FontWeight.w700)), Text('اختبار قصير يعطيك مسارًا أدق', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left, color: inkFaint)])),
+    if (score > 0) ...[
+      const SizedBox(height: 12),
+      _Card(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AchievementScreen(profile: profile!))), child: Row(children: [Container(width: 46, height: 46, decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.emoji_events_outlined, color: primary)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('بطاقة إنجازك', style: ar(14, weight: FontWeight.w700)), Text('احفظها أو شارك تقدمك مع الآخرين', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left_rounded, color: inkFaint)])),
+    ],
+
     const _SectionTitle('سجل الأخطاء المتكررة'),
     _Card(child: ListTile(contentPadding: EdgeInsets.zero, leading: const CircleAvatar(radius: 12, backgroundColor: primaryTint, child: Icon(Icons.auto_awesome, size: 15, color: primary)), title: const Text('سجل أخطائك يظهر هنا'), subtitle: Text('بعد أول محادثة ستجد ملاحظاتك الحقيقية هنا', style: ar(11.5, color: inkFaint)))),
   ]);
@@ -930,7 +973,8 @@ class ProfileContent extends StatefulWidget {
   final HiwarApi api;
   final HiwarProfile? profile;
   final Future<void> Function()? onSignOut;
-  const ProfileContent({super.key, required this.api, this.profile, this.onSignOut});
+  final Future<void> Function()? onAccountDeleted;
+  const ProfileContent({super.key, required this.api, this.profile, this.onSignOut, this.onAccountDeleted});
   @override State<ProfileContent> createState() => _ProfileContentState();
 }
 
@@ -1020,6 +1064,55 @@ class _ProfileContentState extends State<ProfileContent> {
       MaterialPageRoute(builder: (_) => ProfileEditScreen(api: widget.api, profile: current)),
     );
     if (updated != null && mounted) setState(() => editedProfile = updated);
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    final confirmation = TextEditingController();
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: Text('حذف الحساب نهائيًا', style: ar(17, weight: FontWeight.w800, color: rust)),
+            content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('سيتم حذف حسابك وجميع المحادثات والرسائل والأخطاء ونتائج التدريب من قاعدة البيانات. لا يمكن التراجع عن هذا الإجراء.', style: ar(13, color: inkSoft)),
+              const SizedBox(height: 14),
+              Text('اكتب «حذف» للتأكيد', style: ar(12, weight: FontWeight.w700, color: ink)),
+              const SizedBox(height: 7),
+              TextField(controller: confirmation, autofocus: true, textDirection: TextDirection.rtl, decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'حذف')),
+            ]),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text('إلغاء', style: ar(13, weight: FontWeight.w700, color: inkSoft))),
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: confirmation,
+                builder: (_, value, __) => FilledButton(
+                  onPressed: value.text.trim() == 'حذف' ? () => Navigator.pop(dialogContext, true) : null,
+                  style: FilledButton.styleFrom(backgroundColor: rust, foregroundColor: Colors.white),
+                  child: Text('حذف نهائيًا', style: ar(13, weight: FontWeight.w700, color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      setState(() => loading = true);
+      try {
+        await widget.api.deleteAccount();
+        final onAccountDeleted = widget.onAccountDeleted;
+        if (onAccountDeleted != null) await onAccountDeleted();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف الحساب نهائيًا.')));
+      } catch (_) {
+        if (mounted) {
+          setState(() => loading = false);
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر حذف الحساب. لم يتم مسح أي بيانات، حاول مرة أخرى.')));
+        }
+      }
+    } finally {
+      confirmation.dispose();
+    }
   }
 
   Future<void> _confirmSignOut() async {
@@ -1119,25 +1212,31 @@ class _ProfileContentState extends State<ProfileContent> {
       if (!loading && error != null) Padding(padding: const EdgeInsets.only(top: 16), child: Text('تعذر تحميل الإحصاءات: $error', style: ar(11, color: rust))),
       const SizedBox(height: 26),
       _Card(
-        child: SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: _confirmSignOut,
-            icon: const Icon(Icons.logout_rounded, color: rust, size: 19),
-            label: Text(
-              'تسجيل الخروج',
-              style: ar(13.5, weight: FontWeight.w700, color: rust),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: rust,
-              side: const BorderSide(color: Color(0xFFE8BFC3)),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+        child: Column(children: [
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _confirmSignOut,
+              icon: const Icon(Icons.logout_rounded, color: rust, size: 19),
+              label: Text('تسجيل الخروج', style: ar(13.5, weight: FontWeight.w700, color: rust)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: rust,
+                side: const BorderSide(color: Color(0xFFE8BFC3)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
             ),
           ),
-        ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton.icon(
+              onPressed: _confirmDeleteAccount,
+              icon: const Icon(Icons.delete_outline_rounded, color: rust, size: 18),
+              label: Text('حذف الحساب نهائيًا', style: ar(12.5, weight: FontWeight.w700, color: rust)),
+            ),
+          ),
+        ]),
       ),
     ]);
   }
@@ -1960,5 +2059,177 @@ class _PersonalizedErrorQuizScreenState extends State<PersonalizedErrorQuizScree
         ],
       ),
     );
+  }
+}
+
+
+class JournalScreen extends StatefulWidget {
+  final HiwarApi api;
+  const JournalScreen({super.key, required this.api});
+  @override
+  State<JournalScreen> createState() => _JournalScreenState();
+}
+
+class _JournalScreenState extends State<JournalScreen> {
+  final entry = TextEditingController();
+  HiwarJournalResult? result;
+  bool busy = false;
+  String? error;
+
+  @override
+  void dispose() {
+    entry.dispose();
+    super.dispose();
+  }
+
+  Future<void> _analyze() async {
+    final text = entry.text.trim();
+    if (text.length < 2) {
+      setState(() => error = 'اكتب جملتين قصيرتين على الأقل عن يومك.');
+      return;
+    }
+    setState(() { busy = true; error = null; result = null; });
+    try {
+      final userId = await widget.api.getStoredUserId() ?? await widget.api.getUserId();
+      final next = await widget.api.analyzeJournal(userId: userId, text: text);
+      if (mounted) setState(() { result = next; busy = false; });
+    } catch (_) {
+      if (mounted) setState(() { busy = false; error = 'تعذر تحليل اليومية. تأكد من تشغيل Backend وتفعيل مزود الذكاء الاصطناعي.'; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: bg,
+    appBar: AppBar(backgroundColor: bg, elevation: 0, title: Text('يومياتك بالإنجليزي', style: ar(16, weight: FontWeight.w700))),
+    body: ListView(padding: const EdgeInsets.fromLTRB(20, 10, 20, 30), children: [
+      _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('اكتب 2–3 جمل عن يومك', style: ar(16, weight: FontWeight.w800)),
+        const SizedBox(height: 6),
+        Text('سنصحح كلامك ونحوّله إلى سؤال طبيعي للمحادثة.', style: ar(12, color: inkFaint)),
+        const SizedBox(height: 14),
+        TextField(controller: entry, maxLines: 5, textDirection: TextDirection.ltr, textAlign: TextAlign.left, decoration: const InputDecoration(hintText: 'Today I...', filled: true, fillColor: bg, border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+        SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: busy ? null : _analyze, icon: const Icon(Icons.auto_awesome_outlined), label: Text(busy ? 'جاري التحليل...' : 'حلّل يوميتي', style: ar(13, weight: FontWeight.w700)), style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.all(14)))),
+      ])),
+      if (error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(error!, style: ar(12, color: rust))),
+      if (result != null) ...[
+        const _SectionTitle('مرآة كلامك'),
+        _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('الأصل', style: ar(11, color: inkFaint)),
+          const SizedBox(height: 4),
+          Text(result!.originalText, style: en(13, color: rust).copyWith(height: 1.5)),
+          const Divider(height: 22, color: line),
+          Text('الأفضل', style: ar(11, color: inkFaint)),
+          const SizedBox(height: 4),
+          Text(result!.correctedText, style: en(13, weight: FontWeight.w700, color: primaryDark).copyWith(height: 1.5)),
+          if (result!.corrections.isNotEmpty) ...[
+            const Divider(height: 22, color: line),
+            for (final correction in result!.corrections) Text('${correction['wrong']} → ${correction['correct']}\n${correction['explanation']}', style: ar(12, color: inkSoft).copyWith(height: 1.6)),
+          ],
+        ])),
+        const _SectionTitle('سؤال المحادثة'),
+        _Card(child: Column(children: [Text(result!.followUpQuestion, style: en(14, weight: FontWeight.w600, color: inkSoft).copyWith(height: 1.6)), const SizedBox(height: 12), SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => VoiceScreen(api: widget.api, initialPrompt: result!.followUpQuestion))), icon: const Icon(Icons.mic_none_rounded),
+ label: Text('تحدث عن هذا الموضوع', style: ar(13, weight: FontWeight.w700)), style: FilledButton.styleFrom(backgroundColor: primary)))])),
+      ],
+    ]),
+  );
+}
+
+class GoalPacksScreen extends StatelessWidget {
+  final HiwarApi api;
+  const GoalPacksScreen({super.key, required this.api});
+
+  static const packs = <Map<String, String>>[
+    {'title': 'مقابلة عمل', 'subtitle': 'خطة 7 أيام · تحدث عن خبرتك بثقة', 'icon': '💼'},
+    {'title': 'السفر', 'subtitle': 'خطة 5 أيام · المطار والفندق والمطعم', 'icon': '✈️'},
+    {'title': 'IELTS Speaking', 'subtitle': 'خطة 7 أيام · تدرب على إجابات واضحة', 'icon': '🎯'},
+  ];
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: bg,
+    appBar: AppBar(backgroundColor: bg, elevation: 0, title: Text('استعد لهدف قريب', style: ar(16, weight: FontWeight.w700))),
+    body: ListView(padding: const EdgeInsets.fromLTRB(20, 10, 20, 30), children: [
+      Text('اختر هدفًا قريبًا، وسنحوّل التدريب إلى خطوات يومية قصيرة.', style: ar(12.5, color: inkSoft).copyWith(height: 1.6)),
+      const SizedBox(height: 14),
+      for (final pack in packs) Padding(padding: const EdgeInsets.only(bottom: 12), child: _Card(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PackDetailScreen(api: api, pack: pack))), child: Row(children: [Text(pack['icon']!, style: const TextStyle(fontSize: 25)), const SizedBox(width: 13), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(pack['title']!, style: ar(14.5, weight: FontWeight.w800)), const SizedBox(height: 4), Text(pack['subtitle']!, style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left_rounded, color: inkFaint)]))),
+    ]),
+  );
+}
+
+class PackDetailScreen extends StatelessWidget {
+  final HiwarApi api;
+  final Map<String, String> pack;
+  const PackDetailScreen({super.key, required this.api, required this.pack});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: bg,
+    appBar: AppBar(backgroundColor: bg, elevation: 0, title: Text(pack['title']!, style: ar(16, weight: FontWeight.w700))),
+    body: ListView(padding: const EdgeInsets.fromLTRB(20, 10, 20, 30), children: [
+      _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${pack['icon']}  ${pack['title']}', style: ar(18, weight: FontWeight.w800)), const SizedBox(height: 8), Text(pack['subtitle']!, style: ar(12.5, color: inkSoft)), const SizedBox(height: 16), for (var i = 1; i <= 5; i++) Padding(padding: const EdgeInsets.only(bottom: 10), child: Row(children: [CircleAvatar(radius: 13, backgroundColor: primaryTint, child: Text('$i', style: mono(11, color: primary))), const SizedBox(width: 10), Expanded(child: Text(i == 1 ? 'تعرف على كلمات الموقف الأساسية' : i == 5 ? 'محادثة كاملة مع المدرب' : 'تدرب على إجابة قصيرة بصوت واضح', style: ar(12.5, color: inkSoft)))]))])),
+      const SizedBox(height: 14),
+      FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => VoiceScreen(api: api, initialPrompt: 'Tell me about your ${pack['title']!.toLowerCase()} experience.'))), icon: const Icon(Icons.play_arrow_rounded),
+ label: Text('ابدأ تدريب اليوم', style: ar(13, weight: FontWeight.w700)), style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.all(15))),
+    ]),
+  );
+}
+
+class VoiceTimelineScreen extends StatefulWidget {
+  final HiwarApi api;
+  const VoiceTimelineScreen({super.key, required this.api});
+  @override
+  State<VoiceTimelineScreen> createState() => _VoiceTimelineScreenState();
+}
+
+class _VoiceTimelineScreenState extends State<VoiceTimelineScreen> {
+  List<Map<String, String>> entries = const [];
+  bool loading = true;
+  final FlutterTts tts = FlutterTts();
+
+  @override
+  void initState() { super.initState(); _load(); }
+  Future<void> _load() async { final data = await widget.api.getVoiceTimeline(); if (mounted) setState(() { entries = data; loading = false; }); }
+  Future<void> _play(String text) async { await tts.setLanguage('en-US'); await tts.setSpeechRate(.78); await tts.speak(text); }
+  @override
+  void dispose() { tts.stop(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final first = entries.isNotEmpty ? entries.last : null;
+    final latest = entries.isNotEmpty ? entries.first : null;
+    return Scaffold(backgroundColor: bg, appBar: AppBar(backgroundColor: bg, elevation: 0, title: Text('اسمع تطورك', style: ar(16, weight: FontWeight.w700))), body: loading ? const Center(child: CircularProgressIndicator(color: primary)) : ListView(padding: const EdgeInsets.fromLTRB(20, 10, 20, 30), children: [
+      if (entries.length < 2) _Card(child: Column(children: [const Icon(Icons.graphic_eq_rounded, color: primary, size: 30), const SizedBox(height: 10), Text('سجّل محادثتين على الأقل حتى تسمع الفرق بين بدايتك وآخر تقدم لك.', textAlign: TextAlign.center, style: ar(13, color: inkSoft).copyWith(height: 1.7))])) else ...[
+        _TimelineCompareCard(title: 'أول خطوة', entry: first!, onPlay: () => _play(first['text']!)),
+        const SizedBox(height: 10),
+        _TimelineCompareCard(title: 'آخر محادثة', entry: latest!, onPlay: () => _play(latest['text']!)),
+        const SizedBox(height: 12),
+        _Card(child: Text('النسخة الأولى تحفظ نص المحادثة وتتيح سماعه للمقارنة. تسجيل الملفات الصوتية الفعلية يحتاج تخزينًا وموافقة صريحة من المستخدم.', style: ar(11.5, color: inkFaint).copyWith(height: 1.7))),
+      ],
+    ]));
+  }
+}
+
+class _TimelineCompareCard extends StatelessWidget {
+  final String title;
+  final Map<String, String> entry;
+  final VoidCallback onPlay;
+  const _TimelineCompareCard({required this.title, required this.entry, required this.onPlay});
+  @override
+  Widget build(BuildContext context) => _Card(child: Row(children: [Container(width: 44, height: 44, decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.graphic_eq_rounded, color: primary)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: ar(14, weight: FontWeight.w800)), const SizedBox(height: 4), Text('كلامك في المحادثة', style: ar(11, color: inkFaint)), Text(entry['text']!, maxLines: 2, overflow: TextOverflow.ellipsis, style: en(12, color: inkSoft))])), IconButton(onPressed: onPlay, icon: const Icon(Icons.play_circle_outline_rounded, color: primary, size: 30))]));
+}
+
+class AchievementScreen extends StatelessWidget {
+  final HiwarProfile profile;
+  const AchievementScreen({super.key, required this.profile});
+  @override
+  Widget build(BuildContext context) {
+    final message = 'حققت مستوى ${profile.level} في Hiwar بنسبة ${profile.levelScore}%.';
+    return Scaffold(backgroundColor: bg, appBar: AppBar(backgroundColor: bg, elevation: 0, title: Text('بطاقة إنجاز', style: ar(16, weight: FontWeight.w700))), body: ListView(padding: const EdgeInsets.fromLTRB(20, 30, 20, 30), children: [
+      _Card(child: Container(padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 14), decoration: BoxDecoration(gradient: const LinearGradient(colors: [primaryDark, primary]), borderRadius: BorderRadius.circular(18)), child: Column(children: [const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 32), const SizedBox(height: 12), Text('إنجاز جديد', style: ar(13, color: Colors.white)), const SizedBox(height: 8), Text(profile.name, style: ar(22, weight: FontWeight.w800, color: Colors.white)), const SizedBox(height: 8), Text(message, textAlign: TextAlign.center, style: ar(13, color: Colors.white).copyWith(height: 1.7))]))),
+      const SizedBox(height: 14),
+      FilledButton.icon(onPressed: () => Share.share(message), icon: const Icon(Icons.share_outlined), label: Text('مشاركة الإنجاز', style: ar(13, weight: FontWeight.w700)), style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.all(15))),
+    ]));
   }
 }
