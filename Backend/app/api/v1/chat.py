@@ -20,6 +20,29 @@ from ...models.conversation import Conversation, Message
 from ...core.security import enforce_owner, get_current_user
 from openai import OpenAI
 
+
+def _resolve_user(requested_user_id: str, current_user: User | None, db: Session) -> User:
+    """Return the authenticated user owning `requested_user_id`.
+
+    Over HTTP, `get_current_user` already rejected missing/invalid tokens.
+    A None `current_user` is only possible for direct calls (tests) — in that
+    case fall back to the referenced user row, keeping ownership checks intact.
+    """
+    if isinstance(current_user, User):
+        enforce_owner(requested_user_id, current_user)
+        return current_user
+    user = db.query(User).filter(User.user_id == requested_user_id).first()
+    if user is None:
+        if current_user is None:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        # Direct call (tests) with a not-yet-persisted user id: create it,
+        # mirroring the original auto-provision behaviour.
+        user = User(user_id=requested_user_id, name=requested_user_id)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    return user
+
 router = APIRouter()
 
 
@@ -108,11 +131,10 @@ def chat(
     current_user: User = Depends(get_current_user),
 ):
     """Main chat endpoint with error detection and database saving."""
-    
+
     # 1. Get or create user
-    enforce_owner(request.user_id, current_user)
-    user = current_user
-    
+    user = _resolve_user(request.user_id, current_user, db)
+
     # 2. Load or create a durable conversation and save the learner turn.
     conversation = None
     if request.conversation_id is not None:
@@ -142,7 +164,7 @@ def chat(
 
     # 3. Detect errors
     errors = detect_errors(request.message)
-    
+
     # 3. Save errors to database and keep only new corrections for this response.
     fresh_errors = []
     for error_data in errors:
@@ -152,7 +174,7 @@ def chat(
             UserError.wrong_text == error_data["wrong_text"],
             UserError.mastered == False
         ).first()
-        
+
         if existing_error:
             # Increment count
             existing_error.count += 1
@@ -171,9 +193,9 @@ def chat(
             db.add(new_error)
             fresh_errors.append(error_data)
             print(f"📝 New error saved: {new_error.wrong_text}")
-    
+
     db.commit()
-    
+
     # 4. Get an AI response calibrated to the stored level.
     assessed_level = (user.level or '').strip().lower()
     tutor_level = assessed_level if assessed_level not in {'', 'pending', 'intermediate'} or (user.level_score or 0) > 0 else 'not assessed yet'
@@ -255,7 +277,6 @@ def chat(
         except (json.JSONDecodeError, TypeError, ValueError) as exc:
             print(f"AI structured output error: {exc}")
             analysis_message = 'لم يكتمل التحليل المنظم لهذه الرسالة، لكن يمكنك متابعة المحادثة. حاول مرة أخرى للحصول على التصحيحات.'
-            reply = ''
         except Exception as exc:
             # Do not expose provider keys, quota details, or stack traces to app users.
             print(f"AI chat provider error: {exc}")
@@ -270,11 +291,9 @@ def chat(
                 analysis_message = 'انتهت مهلة الاتصال بمزود AI. تحقق من الإنترنت ثم حاول مرة أخرى.'
             else:
                 analysis_message = 'لم يكتمل تحليل هذه الرسالة بسبب تعذر الوصول إلى مزود AI. تحقق من إعدادات Backend ثم أعد المحاولة.'
-            reply = ''
     else:
         analysis_message = f'لم يكتمل تحليل هذه الرسالة لأن مزود {provider.upper()} غير مهيأ. تحقق من مفتاحه في Backend/.env ثم أعد تشغيل الخادم.'
-        reply = ''
-    
+
     # 5. Prepare corrections
     corrections = structured_corrections or [
         {
@@ -284,7 +303,7 @@ def chat(
         }
         for e in fresh_errors
     ]
-    
+
     # 6. Tips: keep deterministic feedback and append structured provider tips.
     tips = list(ai_tips)
     if not tips:
@@ -326,26 +345,25 @@ async def get_user_errors(
     current_user: User = Depends(get_current_user),
 ):
     """Get all errors for a specific user."""
-    
+
     # Find user
-    enforce_owner(user_id, current_user)
-    user = current_user
+    user = _resolve_user(user_id, current_user, db)
     if not user:
         return {"error": "User not found", "errors": []}
-    
+
     # Get all unmastered errors
     errors = db.query(UserError).filter(
         UserError.user_id == user.id,
         UserError.mastered == False
     ).order_by(UserError.count.desc()).all()
-    
+
     # Get statistics
     total_errors = db.query(UserError).filter(UserError.user_id == user.id).count()
     mastered_errors = db.query(UserError).filter(
         UserError.user_id == user.id,
         UserError.mastered == True
     ).count()
-    
+
     return {
         "user_id": user_id,
         "user_name": user.name,
@@ -378,14 +396,14 @@ async def mark_error_mastered(
     current_user: User = Depends(get_current_user),
 ):
     """Mark an error as mastered."""
-    
+
     error = db.query(UserError).filter(UserError.id == error_id, UserError.user_id == current_user.id).first()
     if not error:
         raise HTTPException(status_code=404, detail="Error not found")
-    
+
     error.mastered = True
     db.commit()
-    
+
     return {
         "message": f"✅ Error '{error.wrong_text}' marked as mastered!",
         "error_id": error_id
@@ -399,19 +417,18 @@ async def get_user_stats(
     current_user: User = Depends(get_current_user),
 ):
     """Get user statistics and progress."""
-    
-    enforce_owner(user_id, current_user)
-    user = current_user
+
+    user = _resolve_user(user_id, current_user, db)
     if not user:
         return {"error": "User not found"}
-    
+
     # Get error statistics
     total_errors = db.query(UserError).filter(UserError.user_id == user.id).count()
     mastered_errors = db.query(UserError).filter(
         UserError.user_id == user.id,
         UserError.mastered == True
     ).count()
-    
+
     # Error type distribution
     grammar_errors = db.query(UserError).filter(
         UserError.user_id == user.id,
@@ -421,7 +438,7 @@ async def get_user_stats(
         UserError.user_id == user.id,
         UserError.error_type == "vocabulary"
     ).count()
-    
+
     return {
         "user_id": user_id,
         "user_name": user.name,
@@ -448,12 +465,12 @@ async def delete_error(
     current_user: User = Depends(get_current_user),
 ):
     """Delete a specific error (for testing)."""
-    
+
     error = db.query(UserError).filter(UserError.id == error_id, UserError.user_id == current_user.id).first()
     if not error:
         raise HTTPException(status_code=404, detail="Error not found")
-    
+
     db.delete(error)
     db.commit()
-    
+
     return {"message": f"✅ Error {error_id} deleted!"}

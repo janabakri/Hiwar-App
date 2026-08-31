@@ -61,12 +61,12 @@ def detect_errors(text: str) -> List[Dict]:
     """Detect errors in user text."""
     errors = []
     text_lower = text.lower()
-    
+
     for error in COMMON_ERRORS:
-        match = re.search(error["pattern"], text_lower)
+        match = re.search(error["pattern"], text_lower, re.IGNORECASE)
         if match:
             wrong_text = match.group(0)
-            
+
             # Fix the text
             if r"\1" in error["correct"]:
                 groups = match.groups()
@@ -76,12 +76,12 @@ def detect_errors(text: str) -> List[Dict]:
                     correct_text = error["correct"]
             else:
                 correct_text = error["correct"]
-            
+
             errors.append({
                 "wrong_text": wrong_text,
                 "correct_text": correct_text,
                 "error_type": error["type"],
                 "explanation": error["explanation"]
             })
-    
+
     return errors
