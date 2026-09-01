@@ -1257,6 +1257,48 @@ class _ProfileContentState extends State<ProfileContent> {
     }
   }
 
+  void _showPrivacy() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Text('سياسة الخصوصية', style: ar(17, weight: FontWeight.w800)),
+          content: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Text('بياناتك ملكك وحدك. في حوار نجمع أقل قدر ممكن من المعلومات:', style: ar(13, color: inkSoft).copyWith(height: 1.7)),
+            const SizedBox(height: 10),
+            Text('• الاسم والبريد الإلكتروني لإنشاء حسابك فقط.', style: ar(13, color: inkSoft)),
+            const SizedBox(height: 5),
+            Text('• محادثاتك وملاحظاتك تستخدم لتخصيص تدريبك ولا تُشارك مع أي طرف ثالث.', style: ar(13, color: inkSoft)),
+            const SizedBox(height: 5),
+            Text('• لا نبيع بياناتك ولا نستخدمها للإعلانات.', style: ar(13, color: inkSoft)),
+            const SizedBox(height: 5),
+            Text('• يمكنك حذف حسابك وكل بياناتك نهائياً في أي وقت من زر «حذف الحساب» بالأسفل.', style: ar(13, color: inkSoft)),
+          ])),
+          actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text('فهمت', style: ar(13, weight: FontWeight.w700, color: primary)))],
+        ),
+      ),
+    );
+  }
+
+  void _showAbout() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Text('عن حوار', style: ar(17, weight: FontWeight.w800)),
+          content: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Text('حوار — مدرب محادثة إنجليزية بالصوت، يتكلم معك ويربط تصحيحاتك بمستواك الحقيقي.', style: ar(13, color: inkSoft).copyWith(height: 1.7)),
+            const SizedBox(height: 10),
+            Text('الإصدار 1.0.0', style: ar(12, color: inkFaint)),
+          ]),
+          actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text('تم', style: ar(13, weight: FontWeight.w700, color: primary)))],
+        ),
+      ),
+    );
+  }
+
   Future<void> _confirmSignOut() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1338,18 +1380,14 @@ class _ProfileContentState extends State<ProfileContent> {
         const Divider(height: 1, color: line),
         _TrainingRow(icon: Icons.notifications_none_rounded, title: 'تذكير المحادثة اليومية', value: reminderEnabled ? 'مفعّل' : 'متوقف', trailing: Switch(value: reminderEnabled, onChanged: _toggleReminder), onTap: () => _toggleReminder(!reminderEnabled)),
       ])),
-      const _SectionTitle('معلوماتي الشخصية'),
-      _Card(child: Table(
-        columnWidths: const {0: FixedColumnWidth(116)},
-        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-        children: [
-          _profileTableRow('العمر', profile?.age?.toString()),
-          _profileTableRow('المرحلة الدراسية', profile?.educationLevel),
-          _profileTableRow('أهداف التعلم', profile?.learningReason),
-          _profileTableRow('المهارات المطلوبة', profile?.focusSkills),
-          _profileTableRow('البريد الإلكتروني', profile?.email),
-        ],
-      )),
+      const _SectionTitle('الخصوصية والتطبيق'),
+      _Card(child: Column(children: [
+        _TrainingRow(icon: Icons.person_outline_rounded, title: 'معلوماتي الشخصية', value: 'عرض وتعديل', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PersonalInfoScreen(profile: profile)))),
+        const Divider(height: 1, color: line),
+        _TrainingRow(icon: Icons.privacy_tip_outlined, title: 'سياسة الخصوصية', value: '', onTap: _showPrivacy),
+        const Divider(height: 1, color: line),
+        _TrainingRow(icon: Icons.info_outline_rounded, title: 'عن التطبيق', value: '', onTap: _showAbout),
+      ])),
       if (loading) const Padding(padding: EdgeInsets.only(top: 16), child: Center(child: CircularProgressIndicator(color: primary))),
       if (!loading && error != null) Padding(padding: const EdgeInsets.only(top: 16), child: Text('تعذر تحميل الإحصاءات: $error', style: ar(11, color: rust))),
       const SizedBox(height: 26),
@@ -1703,32 +1741,25 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
     }
   }
 
+  // أسئلة متدرجة من الأسهل (A1) للأصعب (C1) — النتيجة تعكس المستوى الحقيقي.
   final grammar = <Map<String, Object>>[
-    {'q': 'She ___ to work every day.', 'a': ['go', 'goes', 'going'], 'correct': 1},
+    {'q': 'I ___ a student.', 'a': ['am', 'is', 'are'], 'correct': 0},
+    {'q': 'She ___ TV every evening.', 'a': ['watch', 'watches', 'watching'], 'correct': 1},
     {'q': 'I have lived here ___ 2020.', 'a': ['for', 'since', 'during'], 'correct': 1},
-    {'q': 'They ___ dinner when I called.', 'a': ['had', 'were having', 'have'], 'correct': 1},
-    {'q': 'If I had time, I ___ more.', 'a': ['study', 'studied', 'would study'], 'correct': 2},
-    {'q': 'This is the book ___ I told you about.', 'a': ['who', 'where', 'that'], 'correct': 2},
-    {'q': 'He ___ already finished the report.', 'a': ['has', 'have', 'having'], 'correct': 0},
-    {'q': 'We ___ to the museum last weekend.', 'a': ['go', 'went', 'gone'], 'correct': 1},
-    {'q': 'There ___ many ways to practice English.', 'a': ['is', 'are', 'be'], 'correct': 1},
+    {'q': 'If I ___ more time, I would travel the world.', 'a': ['have', 'had', 'will have'], 'correct': 1},
+    {'q': 'Rarely ___ such dedication in a new learner.', 'a': ['I have seen', 'have I seen', 'did I saw'], 'correct': 1},
   ];
   final vocabulary = <Map<String, Object>>[
-    {'q': 'What does “accurate” mean?', 'a': ['correct', 'fast', 'difficult'], 'correct': 0},
-    {'q': 'The opposite of “borrow” is…', 'a': ['lend', 'keep', 'buy'], 'correct': 0},
-    {'q': 'A “deadline” is…', 'a': ['a final time', 'a conversation', 'a holiday'], 'correct': 0},
-    {'q': '“Improve” means to…', 'a': ['get better', 'get smaller', 'stop'], 'correct': 0},
-    {'q': 'A person who travels is a…', 'a': ['traveler', 'listener', 'writer'], 'correct': 0},
-    {'q': 'If you are “reliable”, people can…', 'a': ['trust you', 'avoid you', 'forget you'], 'correct': 0},
-    {'q': '“Brief” means…', 'a': ['short', 'expensive', 'noisy'], 'correct': 0},
-    {'q': 'A “habit” is something you…', 'a': ['do regularly', 'buy once', 'never remember'], 'correct': 0},
+    {'q': 'The opposite of “big” is…', 'a': ['small', 'tall', 'long'], 'correct': 0},
+    {'q': '“Delicious” food is…', 'a': ['very tasty', 'very cold', 'very fast'], 'correct': 0},
+    {'q': 'A “reliable” person is someone you can…', 'a': ['trust', 'avoid', 'forget'], 'correct': 0},
+    {'q': '“Meticulous” means…', 'a': ['very careful', 'very lazy', 'very loud'], 'correct': 0},
+    {'q': '“Ubiquitous” describes something…', 'a': ['found everywhere', 'extremely rare', 'very expensive'], 'correct': 0},
   ];
 
   @override
   void initState() {
     super.initState();
-    grammar.shuffle();
-    vocabulary.shuffle();
     listeningOptions = aiChoosesSkill
         ? ['They are practicing ordering coffee.', 'They are discussing a flight cancellation.', 'They are watching a football match.']
         : ['They are practicing ordering coffee.', 'A butterfly is flying over the flowers.', 'The room is completely empty.'];
@@ -1744,7 +1775,7 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
   @override
   void dispose() { speech.stop(); tts.stop(); videoController.dispose(); super.dispose(); }
 
-  List<Map<String, Object>> get currentQuestions => (section == 0 ? grammar : vocabulary).take(5).toList();
+  List<Map<String, Object>> get currentQuestions => (section == 0 ? grammar : vocabulary);
 
   void answer(int index) {
     answeredQuestions++;
@@ -2373,5 +2404,62 @@ class AchievementScreen extends StatelessWidget {
       const SizedBox(height: 14),
       FilledButton.icon(onPressed: () => Share.share(message), icon: const Icon(Icons.share_outlined), label: Text('مشاركة الإنجاز', style: ar(13, weight: FontWeight.w700)), style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.all(15))),
     ]));
+  }
+}
+
+// صفحة المعلومات الشخصية — مستقلة عن بطاقة "حسابي".
+class PersonalInfoScreen extends StatelessWidget {
+  final HiwarProfile? profile;
+  const PersonalInfoScreen({super.key, this.profile});
+
+  String _value(String? value) => value == null || value.trim().isEmpty ? 'غير محدد' : value;
+
+  TableRow _row(String label, String? value) => TableRow(children: [
+    Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Text(label, style: ar(12.5, color: inkFaint))),
+    Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Text(_value(value), style: ar(13, weight: FontWeight.w600, color: inkSoft))),
+  ]);
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = this.profile;
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: bg,
+        appBar: AppBar(backgroundColor: bg, elevation: 0, title: Text('معلوماتي الشخصية', style: ar(17, weight: FontWeight.w800))),
+        body: ListView(padding: const EdgeInsets.fromLTRB(18, 10, 18, 30), children: [
+          _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              Container(width: 52, height: 52, decoration: const BoxDecoration(color: primary, shape: BoxShape.circle), child: Center(child: Text(profile == null || profile.name.trim().isEmpty ? 'ح' : profile.name.trim().substring(0, 1), style: ar(20, weight: FontWeight.w800, color: Colors.white)))),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(profile?.name.trim().isNotEmpty == true ? profile!.name : 'بدون اسم', style: ar(15.5, weight: FontWeight.w800)),
+                Text(_value(profile?.email), style: en(12, color: inkFaint)),
+              ])),
+            ]),
+          ])),
+          const SizedBox(height: 14),
+          _Card(child: Table(
+            columnWidths: const {0: FixedColumnWidth(120)},
+            defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+            children: [
+              _row('العمر', profile?.age?.toString()),
+              _row('المرحلة الدراسية', profile?.educationLevel),
+              _row('أهداف التعلم', profile?.learningReason),
+              _row('المهارات المطلوبة', profile?.focusSkills),
+              _row('الهدف اليومي', profile?.dailyMinutes == null ? null : '${profile!.dailyMinutes} دقيقة'),
+              _row('المستوى', profile?.level),
+            ],
+          )),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.arrow_back_rounded, size: 18),
+            label: Text('رجوع', style: ar(14, weight: FontWeight.w700, color: Colors.white)),
+            style: FilledButton.styleFrom(backgroundColor: primary, padding: const EdgeInsets.symmetric(vertical: 14)),
+          ),
+        ]),
+      ),
+    );
   }
 }
