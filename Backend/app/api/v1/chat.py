@@ -95,7 +95,7 @@ def _generate_gemini(prompt: str) -> str:
         url,
         params={"key": settings.GEMINI_API_KEY},
         json=payload,
-        timeout=30.0,
+        timeout=60.0,
     )
     response.raise_for_status()
     data = response.json()
