@@ -386,6 +386,58 @@ class HiwarApi {
     await prefs.setInt('hiwar_welcome_version', _welcomeVersion);
   }
 
+  // -------- Conversations / suggestion / review / TTS --------
+
+  Future<List<Map<String, dynamic>>> getConversations(String userId) async {
+    final response = await _dio.get('/api/v1/conversations/${Uri.encodeComponent(userId)}');
+    final data = Map<String, dynamic>.from(response.data as Map);
+    return ((data['conversations'] as List?) ?? const []).whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getConversationMessages(String userId, int conversationId) async {
+    final response = await _dio.get('/api/v1/conversations/${Uri.encodeComponent(userId)}/$conversationId');
+    final data = Map<String, dynamic>.from(response.data as Map);
+    return ((data['messages'] as List?) ?? const []).whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+  }
+
+  Future<String?> getSmartSuggestion(String userId) async {
+    try {
+      final response = await _dio.get('/api/v1/suggestion/${Uri.encodeComponent(userId)}');
+      final data = Map<String, dynamic>.from(response.data as Map);
+      if (data['has_suggestion'] != true) return null;
+      return '${data['text'] ?? ''}';
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<List<HiwarError>> getReviewQueue(String userId) async {
+    final response = await _dio.get('/api/v1/review/${Uri.encodeComponent(userId)}');
+    final data = Map<String, dynamic>.from(response.data as Map);
+    return ((data['errors'] as List?) ?? const []).map((item) => HiwarError.fromJson(Map<String, dynamic>.from(item as Map))).toList();
+  }
+
+  Future<void> answerReview({required String userId, required int errorId, required bool remembered}) async {
+    await _dio.post('/api/v1/review/${Uri.encodeComponent(userId)}/answer', data: {'error_id': errorId, 'remembered': remembered});
+  }
+
+  /// يرجع bytes الصوت من ElevenLabs عبر الـ Backend، أو null إذا غير مهيأ.
+  Future<List<int>?> synthesizeSpeech({required String text, String voice = 'female'}) async {
+    try {
+      final response = await _dio.post(
+        '/api/v1/tts',
+        data: {'text': text, 'voice': voice},
+        options: Options(responseType: ResponseType.bytes),
+      );
+      final bytes = response.data;
+      if (bytes is List<int> && bytes.isNotEmpty) return bytes;
+      return null;
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 503) return null; // fallback إلى الصوت المحلي
+      rethrow;
+    }
+  }
+
   Future<HiwarStats> getStats(String userId) async {
     try {
       final response = await _dio.get('/api/v1/stats/${Uri.encodeComponent(userId)}');

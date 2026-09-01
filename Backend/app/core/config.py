@@ -76,6 +76,11 @@ class Settings:
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
     APPLE_CLIENT_ID: str = os.getenv("APPLE_CLIENT_ID", "")
 
+    # Voice (ElevenLabs) — optional; empty key means the app falls back to on-device TTS.
+    ELEVENLABS_API_KEY: str = os.getenv("ELEVENLABS_API_KEY", "")
+    ELEVENLABS_VOICE_ID: str = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
+    ELEVENLABS_MODEL: str = os.getenv("ELEVENLABS_MODEL", "eleven_multilingual_v2")
+
     # Email verification
     SMTP_HOST: str = os.getenv("SMTP_HOST", "")
     SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
@@ -83,6 +88,9 @@ class Settings:
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
     SMTP_FROM: str = os.getenv("SMTP_FROM", "")
     SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "حوار App")
+
+    # Learning reminders (server-side baseline; the client schedules local notifications)
+    REMINDER_DEFAULT_HOUR: int = int(os.getenv("REMINDER_DEFAULT_HOUR", "20"))
 
     def validate(self) -> None:
         if self.APP_ENV in {"production", "prod"}:

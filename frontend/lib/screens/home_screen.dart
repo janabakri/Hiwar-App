@@ -1,7 +1,10 @@
 // مرجع التصميم: نسخة Flutter من speak-app-prototype(2).html؛ RTL، هاتف دافئ، بطاقات بيضاء، بنفسجي #4B3F8F، شاشات home/voice/feedback/explore/progress/profile.
 import 'dart:async';
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -9,6 +12,9 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:video_player/video_player.dart';
 import 'package:share_plus/share_plus.dart';
 import '../services/hiwar_api.dart';
+import '../services/reminder_service.dart';
+import 'conversations_screen.dart';
+import 'review_screen.dart';
 
 const bg = Color(0xFFF6F3EF);
 const paper = Colors.white;
@@ -58,6 +64,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _open(int index) => setState(() => _index = index);
 
+  /// يطلب من المستخدم اختيار موضوع قبل بدء جلسة الصوت.
+  Future<Map<String, String>?> _pickTopic(BuildContext context) async {
+    return showDialog<Map<String, String>>(
+      context: context,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SimpleDialog(
+          title: Text('اختر موضوع محادثتك', style: ar(17, weight: FontWeight.w800)),
+          children: [
+            for (final topic in _conversationTopics)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(dialogContext, topic),
+                child: Row(children: [
+                  Container(width: 38, height: 38, decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(11)), child: const Icon(Icons.chat_bubble_outline_rounded, size: 18, color: primary)),
+                  const SizedBox(width: 10),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(topic['title']!, style: en(13.5, weight: FontWeight.w600)),
+                    Text('المستوى ${topic['level']}', style: ar(11, color: inkFaint)),
+                  ])),
+                ]),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _refreshProfile() async {
     final userId = _profile?.userId;
     if (userId == null || userId.trim().isEmpty) return;
@@ -82,7 +115,11 @@ class _HomeScreenState extends State<HomeScreen> {
       HomeContent(
         api: _api,
         profile: _profile,
-        onVoice: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => VoiceScreen(api: _api))),
+        onVoice: () async {
+          final topic = await _pickTopic(context);
+          if (!context.mounted) return;
+          await Navigator.of(context).push(MaterialPageRoute(builder: (_) => VoiceScreen(api: _api, topic: topic)));
+        },
         onLevelCheck: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LevelCheckScreen(api: _api, userId: _profile?.userId, focusSkills: _profile?.focusSkills, onComplete: _completeLevelCheck))),
       ),
       ExploreContent(api: _api, profile: _profile),
@@ -236,6 +273,13 @@ class _HomeContentState extends State<HomeContent> {
           const SizedBox(width: 5),
           Text(profile == null || profile.daysSinceJoined == 0 ? 'عضو جديد' : 'منذ ${profile.daysSinceJoined} يوم', style: ar(12.5, weight: FontWeight.w600, color: const Color(0xFFB5451A))),
         ])),
+        const SizedBox(width: 8),
+        if ((stats?.streakDays ?? 0) > 0)
+          Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), decoration: BoxDecoration(color: const Color(0xFFFFF3E0), borderRadius: BorderRadius.circular(20)), child: Row(children: [
+            const Icon(Icons.local_fire_department_rounded, color: Color(0xFFE65100), size: 15),
+            const SizedBox(width: 4),
+            Text('${stats!.streakDays} يوم', style: ar(12.5, weight: FontWeight.w700, color: const Color(0xFFE65100))),
+          ])),
       ]),
       const SizedBox(height: 18),
       _Card(child: Row(children: [
@@ -277,6 +321,28 @@ class _HomeContentState extends State<HomeContent> {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(activityTitle, style: ar(14, weight: FontWeight.w700)), Text(activitySubtitle, style: ar(12.5, color: inkFaint))])),
           const Icon(Icons.chevron_left_rounded, color: inkFaint),
         ])),
+        if (errors.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _Card(onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ReviewScreen(api: widget.api, userId: profile?.userId ?? ''))), child: Row(children: [
+            Container(width: 46, height: 46, decoration: BoxDecoration(color: rustTint, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.refresh_rounded, color: rust)),
+            const SizedBox(width: 14),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('راجع ملاحظاتك القديمة', style: ar(14, weight: FontWeight.w700)),
+              Text('تدريب متقطع: نرجّع لك الخطأ قبل ما تنساه', style: ar(12.5, color: inkFaint)),
+            ])),
+            const Icon(Icons.chevron_left_rounded, color: inkFaint),
+          ])),
+        ],
+        const SizedBox(height: 12),
+        _Card(onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ConversationsScreen(api: widget.api, userId: profile?.userId ?? ''))), child: Row(children: [
+          Container(width: 46, height: 46, decoration: BoxDecoration(color: const Color(0xFFE7EEF7), borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.forum_outlined, color: primary)),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('محادثاتك السابقة', style: ar(14, weight: FontWeight.w700)),
+            Text('ارجع لجلستك الأخيرة واقرأ كلامك وتصحيحاته', style: ar(12.5, color: inkFaint)),
+          ])),
+          const Icon(Icons.chevron_left_rounded, color: inkFaint),
+        ])),
       ],
       if (errors.isNotEmpty) ...[
         const _SectionTitle('ملاحظاتك الأخيرة'),
@@ -305,7 +371,8 @@ class _MistakeChip extends StatelessWidget { final String wrong, correct, catego
 class VoiceScreen extends StatefulWidget {
   final HiwarApi api;
   final String? initialPrompt;
-  const VoiceScreen({super.key, required this.api, this.initialPrompt});
+  final Map<String, String>? topic; // موضوع مختار من المستخدم (اختياري)
+  const VoiceScreen({super.key, required this.api, this.initialPrompt, this.topic});
 
   @override
   State<VoiceScreen> createState() => _VoiceScreenState();
@@ -335,7 +402,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
   String voicePreference = 'female';
   double speechRate = 0.78;
   String? tutorInstruction;
-  late final Map<String, String> sessionTopic = _conversationTopics[Random().nextInt(_conversationTopics.length)];
+  late final Map<String, String> sessionTopic = widget.topic ?? _conversationTopics[Random().nextInt(_conversationTopics.length)];
 
   @override
   void initState() {
@@ -521,6 +588,19 @@ class _VoiceScreenState extends State<VoiceScreen> {
       if (mounted) setState(() => status = 'لا يوجد رد صالح من المدرب حتى يكتمل تحليل Gemini.');
       return;
     }
+    // 1) جرّب صوت ElevenLabs من الـ Backend (إن كان مهيأً).
+    try {
+      final bytes = await widget.api.synthesizeSpeech(text: text, voice: voicePreference);
+      if (bytes != null) {
+        final player = AudioPlayer();
+        await player.play(BytesSource(Uint8List.fromList(bytes)));
+        if (mounted) setState(() => status = 'صوت المدرب (ElevenLabs) يعمل الآن');
+        return;
+      }
+    } catch (_) {
+      // fallback إلى الصوت المحلي.
+    }
+    // 2) الصوت المحلي (flutter_tts).
     try {
       await _configureTts();
       await tts.stop();
@@ -890,27 +970,60 @@ class _WordChip extends StatelessWidget {
   }
 }
 
-class ExploreContent extends StatelessWidget {
+class ExploreContent extends StatefulWidget {
   final HiwarApi api;
   final HiwarProfile? profile;
   const ExploreContent({super.key, required this.api, this.profile});
+  @override State<ExploreContent> createState() => _ExploreContentState();
+}
+
+class _ExploreContentState extends State<ExploreContent> {
+  String? suggestion;
+  HiwarStats? stats;
 
   @override
-  Widget build(BuildContext context) => ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 28), children: [
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final userId = widget.profile?.userId;
+    if (userId == null || userId.trim().isEmpty) return;
+    try { stats = await widget.api.getStats(userId); } catch (_) {}
+    final text = await widget.api.getSmartSuggestion(userId);
+    if (mounted) setState(() { suggestion = text; });
+  }
+
+  // نسب محسوبة من بيانات المستخدم الفعلية — لا أرقام ثابتة.
+  int _pct(int value, int max) => value <= 0 ? 0 : (value * 100 ~/ max).clamp(0, 100);
+
+  @override
+  Widget build(BuildContext context) {
+    final sessions = stats?.totalSessions ?? 0;
+    final mastered = stats?.masteryRate.round() ?? 0;
+    final streak = stats?.streakDays ?? 0;
+    final hasData = sessions > 0;
+    final speaking = hasData ? _pct(sessions * 12 + streak * 3, 100) : 0;
+    final listening = hasData ? _pct(sessions * 10, 100) : 0;
+    final grammar = hasData ? mastered : 0;
+    final vocabulary = hasData ? _pct(sessions * 8, 100) : 0;
+    return ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 28), children: [
     const _SectionTitle('استكشف'),
     Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(gradient: const LinearGradient(colors: [primaryDark, primary]), borderRadius: BorderRadius.circular(18)), child: Row(children: [
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('✦ اقتراح ذكي لك', style: ar(11, weight: FontWeight.w700, color: Colors.white)), const SizedBox(height: 8), Text('بناءً على محادثاتك الأخيرة، ركّزي هالأسبوع على Present Perfect ونطق حرف th — قبل ما ننتقل لمهارة جديدة.', style: ar(13, color: Colors.white).copyWith(height: 1.6))])),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('✦ اقتراح ذكي لك', style: ar(11, weight: FontWeight.w700, color: Colors.white)), const SizedBox(height: 8), Text(suggestion ?? 'أكمل أول محادثة وسيظهر اقتراحك هنا مبني على كلامك الحقيقي.', style: ar(13, color: Colors.white).copyWith(height: 1.6))])),
       const SizedBox(width: 8),
       _SparkleArt(),
     ])),
         const SizedBox(height: 16),
-    _Card(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => JournalScreen(api: api))), child: Row(children: [Container(width: 46, height: 46, decoration: BoxDecoration(color: coralTint, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.edit_note_rounded, color: Color(0xFFB5451A))), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('يومياتك بالإنجليزي', style: ar(14, weight: FontWeight.w700)), Text('اكتب عن يومك وحوّل كلامك إلى محادثة', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left_rounded, color: inkFaint)])),
+    _Card(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => JournalScreen(api: widget.api))), child: Row(children: [Container(width: 46, height: 46, decoration: BoxDecoration(color: coralTint, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.edit_note_rounded, color: Color(0xFFB5451A))), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('يومياتك بالإنجليزي', style: ar(14, weight: FontWeight.w700)), Text('اكتب عن يومك وحوّل كلامك إلى محادثة', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left_rounded, color: inkFaint)])),
     const SizedBox(height: 12),
-    _Card(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GoalPacksScreen(api: api))), child: Row(children: [Container(width: 46, height: 46, decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.flag_outlined, color: primary)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('استعد لهدف قريب', style: ar(14, weight: FontWeight.w700)), Text('خطط قصيرة للسفر ومقابلة العمل وIELTS', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left_rounded, color: inkFaint)])),
+    _Card(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GoalPacksScreen(api: widget.api))), child: Row(children: [Container(width: 46, height: 46, decoration: BoxDecoration(color: primaryTint, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.flag_outlined, color: primary)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('استعد لهدف قريب', style: ar(14, weight: FontWeight.w700)), Text('خطط قصيرة للسفر ومقابلة العمل وIELTS', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left_rounded, color: inkFaint)])),
     const SizedBox(height: 16),
     GridView.count(shrinkWrap: true,
- physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1.05, children: [_Skill(title: 'التحدث', english: 'Speaking', value: 70, color: primaryTint), _Skill(title: 'الاستماع', english: 'Listening', value: 55, color: const Color(0xFFE7EEF7)), _Skill(title: 'القراءة', english: 'Reading', value: 48, color: const Color(0xFFF7EEDB)), _Skill(title: 'الكتابة', english: 'Writing', value: 40, color: const Color(0xFFF6E6EB)), _Skill(title: 'القواعد', english: 'Grammar', value: 58, color: const Color(0xFFE9E7F2)), _Skill(title: 'المفردات', english: 'Vocabulary', value: 65, color: const Color(0xFFF8E7E6))],),
+ physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1.05, children: [_Skill(title: 'التحدث', english: 'Speaking', value: speaking, color: primaryTint), _Skill(title: 'الاستماع', english: 'Listening', value: listening, color: const Color(0xFFE7EEF7)), _Skill(title: 'القواعد', english: 'Grammar', value: grammar, color: const Color(0xFFE9E7F2)), _Skill(title: 'المفردات', english: 'Vocabulary', value: vocabulary, color: const Color(0xFFF8E7E6))],),
   ]);
+  }
 }
 class _Skill extends StatelessWidget {
   final String title;
@@ -956,6 +1069,10 @@ class ProgressContent extends StatelessWidget {
         const SizedBox(height: 14),
     _Card(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => VoiceTimelineScreen(api: api))), child: Row(children: [Container(width: 46, height: 46, decoration: BoxDecoration(color: coralTint, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.graphic_eq_rounded, color: Color(0xFFB5451A))), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('اسمع تطورك', style: ar(14, weight: FontWeight.w700)), Text('قارن آخر محادثة بأول خطوة لك', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left_rounded, color: inkFaint)])),
     const SizedBox(height: 12),
+        _Card(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ConversationsScreen(api: api, userId: profile?.userId ?? ''))), child: Row(children: [Container(width: 46, height: 46, decoration: BoxDecoration(color: const Color(0xFFE7EEF7), borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.forum_outlined, color: primary)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('محادثاتك السابقة', style: ar(14, weight: FontWeight.w700)), Text('اقرأ أي جلسة كاملة وقت ما بدك', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left_rounded, color: inkFaint)])),
+    const SizedBox(height: 12),
+        _Card(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReviewScreen(api: api, userId: profile?.userId ?? ''))), child: Row(children: [Container(width: 46, height: 46, decoration: BoxDecoration(color: rustTint, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.refresh_rounded, color: rust)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('راجع ملاحظاتك القديمة', style: ar(14, weight: FontWeight.w700)), Text('تدريب متقطع يخليك ما تنسى تصحيحاتك', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left_rounded, color: inkFaint)])),
+    const SizedBox(height: 12),
         _Card(onTap: onLevelCheck,
 	 child: Row(children: [const _LevelMeterArt(size: 58), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('حدد مستواك من جديد', style: ar(14, weight: FontWeight.w700)), Text('اختبار قصير يعطيك مسارًا أدق', style: ar(11.5, color: inkFaint))])), const Icon(Icons.chevron_left, color: inkFaint)])),
     if (score > 0) ...[
@@ -983,7 +1100,7 @@ class _ProfileContentState extends State<ProfileContent> {
   HiwarProfile? editedProfile;
   String? error;
   bool loading = true;
-  bool reminderEnabled = true;
+  bool reminderEnabled = false;
   String voicePreference = 'female';
 
   @override
@@ -992,6 +1109,31 @@ class _ProfileContentState extends State<ProfileContent> {
     editedProfile = widget.profile;
     _load();
     _loadVoicePreference();
+    _loadReminder();
+  }
+
+  Future<void> _loadReminder() async {
+    final enabled = await ReminderService.isEnabled();
+    if (mounted) setState(() => reminderEnabled = enabled);
+  }
+
+  Future<void> _toggleReminder(bool value) async {
+    setState(() => reminderEnabled = value);
+    try {
+      if (value && !ReminderService.supported) {
+        if (mounted) {
+          setState(() => reminderEnabled = false);
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('التذكيرات مدعومة على تطبيق الهاتف حالياً.')));
+        }
+        return;
+      }
+      await ReminderService.setEnabled(enabled: value);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value ? 'راح يوصلك تذكير يومي 8 مساءً 🎙️' : 'تم إيقاف التذكير اليومي.')));
+      }
+    } catch (_) {
+      if (mounted) setState(() => reminderEnabled = !value);
+    }
   }
 
   Future<void> _loadVoicePreference() async {
@@ -1194,7 +1336,7 @@ class _ProfileContentState extends State<ProfileContent> {
         const Divider(height: 1, color: line),
         _TrainingRow(icon: Icons.record_voice_over_outlined, title: 'صوت المدرب', value: voicePreference == 'male' ? 'صوت ولد' : 'صوت بنت', onTap: _chooseVoice),
         const Divider(height: 1, color: line),
-        _TrainingRow(icon: Icons.notifications_none_rounded, title: 'تذكير المحادثة اليومية', value: reminderEnabled ? 'مفعّل' : 'متوقف', trailing: Switch(value: reminderEnabled, onChanged: (value) => setState(() => reminderEnabled = value)), onTap: () => setState(() => reminderEnabled = !reminderEnabled)),
+        _TrainingRow(icon: Icons.notifications_none_rounded, title: 'تذكير المحادثة اليومية', value: reminderEnabled ? 'مفعّل' : 'متوقف', trailing: Switch(value: reminderEnabled, onChanged: _toggleReminder), onTap: () => _toggleReminder(!reminderEnabled)),
       ])),
       const _SectionTitle('معلوماتي الشخصية'),
       _Card(child: Table(

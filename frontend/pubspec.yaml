@@ -21,6 +21,9 @@ dependencies:
   flutter_tts: ^3.8.0
   video_player: ^2.9.2
   share_plus: ^10.1.4
+  flutter_local_notifications: ^17.2.3
+  timezone: ^0.9.4
+  audioplayers: ^6.1.0
 
 dev_dependencies:
   flutter_test:

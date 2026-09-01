@@ -8,9 +8,11 @@ import 'screens/auth_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'services/hiwar_api.dart';
+import 'services/reminder_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await ReminderService.init(); // إشعارات محلية للتذكير اليومي (يتجاهل نفسه على الويب)
   // Backend secrets must stay server-side. Web already has a safe localhost fallback.
   if (!kIsWeb) await dotenv.load(fileName: '.env', isOptional: true);
   runApp(const SpeakReplicaApp());

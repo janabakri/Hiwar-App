@@ -3,6 +3,7 @@ Chat API endpoints with database integration.
 """
 
 import json
+import logging
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -19,6 +20,9 @@ from ...models.error import UserError
 from ...models.conversation import Conversation, Message
 from ...core.security import enforce_owner, get_current_user
 from openai import OpenAI
+
+
+logger = logging.getLogger(__name__)
 
 
 def _resolve_user(requested_user_id: str, current_user: User | None, db: Session) -> User:
@@ -179,7 +183,7 @@ def chat(
             # Increment count
             existing_error.count += 1
             existing_error.last_occurrence = datetime.utcnow()
-            print(f"🔄 Error repeated: {existing_error.wrong_text} (count: {existing_error.count})")
+            logger.info("Error repeated: %s (count: %s)", existing_error.wrong_text, existing_error.count)
         else:
             # Create new error
             new_error = UserError(
@@ -192,7 +196,7 @@ def chat(
             )
             db.add(new_error)
             fresh_errors.append(error_data)
-            print(f"📝 New error saved: {new_error.wrong_text}")
+            logger.info("New error saved: %s", new_error.wrong_text)
 
     db.commit()
 
@@ -275,11 +279,11 @@ def chat(
                 ]
             ai_tips = [str(item) for item in parsed.get("tips", []) if item]
         except (json.JSONDecodeError, TypeError, ValueError) as exc:
-            print(f"AI structured output error: {exc}")
+            logger.warning("AI structured output error: %s", exc)
             analysis_message = 'لم يكتمل التحليل المنظم لهذه الرسالة، لكن يمكنك متابعة المحادثة. حاول مرة أخرى للحصول على التصحيحات.'
         except Exception as exc:
             # Do not expose provider keys, quota details, or stack traces to app users.
-            print(f"AI chat provider error: {exc}")
+            logger.exception("AI chat provider error")
             message = str(exc).lower()
             if '429' in message or 'quota' in message or 'insufficient_quota' in message:
                 analysis_message = 'لم يكتمل تحليل هذه الرسالة لأن حد استخدام مزود AI انتهى. تحقق من الخطة أو استخدم مزودًا آخر.'
@@ -456,21 +460,3 @@ async def get_user_stats(
             }
         }
     }
-
-
-@router.delete("/errors/{error_id}")
-async def delete_error(
-    error_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Delete a specific error (for testing)."""
-
-    error = db.query(UserError).filter(UserError.id == error_id, UserError.user_id == current_user.id).first()
-    if not error:
-        raise HTTPException(status_code=404, detail="Error not found")
-
-    db.delete(error)
-    db.commit()
-
-    return {"message": f"✅ Error {error_id} deleted!"}
