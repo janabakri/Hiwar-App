@@ -213,7 +213,7 @@ def sign_up(request: SignUpRequest, db: Session = Depends(get_db)):
     except (OSError, smtplib.SMTPException):
         sent = False
     if not sent:
-        return {"message": "تم إنشاء الحساب، لكن لم يتم إرسال رسالة البريد. يجب إعداد SMTP في Backend.", "email": email, "sent": False}
+        return {"message": "تم إنشاء الحساب، لكن لم يتم إرسال رسالة البريد. يجب إعداد خدمة البريد.", "email": email, "sent": False}
     return {"message": "تم إنشاء الحساب. أرسلنا رمز التحقق إلى بريدك الإلكتروني.", "email": email, "sent": True}
 
 

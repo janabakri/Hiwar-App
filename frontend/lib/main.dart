@@ -12,8 +12,9 @@ import 'services/reminder_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await ReminderService.init(); // إشعارات محلية للتذكير اليومي (يتجاهل نفسه على الويب)
-  // Backend secrets must stay server-side. Web already has a safe localhost fallback.
+  await ReminderService
+      .init(); // إشعارات محلية للتذكير اليومي (يتجاهل نفسه على الويب)
+  // API secrets must stay server-side. Web already has a safe localhost fallback.
   if (!kIsWeb) await dotenv.load(fileName: '.env', isOptional: true);
   runApp(const SpeakReplicaApp());
 }
@@ -31,7 +32,8 @@ class SpeakReplicaApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: const Color(0xFFEEEAE4),
-        colorScheme: ColorScheme.fromSeed(seedColor: primary, brightness: Brightness.light),
+        colorScheme: ColorScheme.fromSeed(
+            seedColor: primary, brightness: Brightness.light),
         textTheme: GoogleFonts.ibmPlexSansArabicTextTheme(),
       ),
       home: const AuthGate(),
@@ -41,7 +43,8 @@ class SpeakReplicaApp extends StatelessWidget {
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
-  @override State<AuthGate> createState() => _AuthGateState();
+  @override
+  State<AuthGate> createState() => _AuthGateState();
 }
 
 class _AuthGateState extends State<AuthGate> {
@@ -51,12 +54,17 @@ class _AuthGateState extends State<AuthGate> {
   bool welcomeSeen = false;
   bool needsLevelCheck = false;
 
-  @override void initState() { super.initState(); _restore(); }
+  @override
+  void initState() {
+    super.initState();
+    _restore();
+  }
 
   bool _needsLevel(HiwarProfile value) {
     final level = value.level.trim().toLowerCase();
     final asksAiToAssess = (value.focusSkills ?? '').contains('ما أعرف');
-    final hasNoResult = value.levelScore <= 0 || level.isEmpty || level == 'pending';
+    final hasNoResult =
+        value.levelScore <= 0 || level.isEmpty || level == 'pending';
     return asksAiToAssess && hasNoResult;
   }
 
@@ -67,23 +75,39 @@ class _AuthGateState extends State<AuthGate> {
       try {
         profile = await api.getProfile(userId);
         needsLevelCheck = _needsLevel(profile!);
-      } catch (_) { profile = null; }
+      } catch (_) {
+        profile = null;
+      }
     }
     if (mounted) setState(() => loading = false);
   }
 
   Future<void> _onSignedOut() async {
     await api.signOut();
-    if (mounted) setState(() { profile = null; needsLevelCheck = false; });
+    if (mounted)
+      setState(() {
+        profile = null;
+        needsLevelCheck = false;
+      });
   }
 
   Future<void> _onAccountDeleted() async {
-    if (mounted) setState(() { profile = null; needsLevelCheck = false; });
+    if (mounted)
+      setState(() {
+        profile = null;
+        needsLevelCheck = false;
+      });
   }
 
-  void _signedIn(HiwarProfile next) => setState(() { profile = next; needsLevelCheck = _needsLevel(next); });
+  void _signedIn(HiwarProfile next) => setState(() {
+        profile = next;
+        needsLevelCheck = _needsLevel(next);
+      });
 
-  void _onOnboardingComplete(HiwarProfile next) => setState(() { profile = next; needsLevelCheck = _needsLevel(next); });
+  void _onOnboardingComplete(HiwarProfile next) => setState(() {
+        profile = next;
+        needsLevelCheck = _needsLevel(next);
+      });
 
   Future<void> _onLevelComplete() async {
     final id = profile?.userId;
@@ -91,20 +115,40 @@ class _AuthGateState extends State<AuthGate> {
     if (id == null) return;
     try {
       final updated = await api.getProfile(id);
-      if (mounted) setState(() { profile = updated; needsLevelCheck = false; });
+      if (mounted)
+        setState(() {
+          profile = updated;
+          needsLevelCheck = false;
+        });
     } catch (_) {
       // The result was already saved; keep the user in the app even if refresh fails.
       if (mounted) setState(() => needsLevelCheck = false);
     }
   }
 
-  @override Widget build(BuildContext context) {
-    if (loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (profile == null && !welcomeSeen) return WelcomeScreen(onContinue: () async { await api.markWelcomeSeen(); if (mounted) setState(() => welcomeSeen = true); });
+  @override
+  Widget build(BuildContext context) {
+    if (loading)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (profile == null && !welcomeSeen)
+      return WelcomeScreen(onContinue: () async {
+        await api.markWelcomeSeen();
+        if (mounted) setState(() => welcomeSeen = true);
+      });
     if (profile == null) return AuthScreen(api: api, onSignedIn: _signedIn);
-    if (!profile!.profileComplete) return OnboardingScreen(api: api, profile: profile!, onComplete: _onOnboardingComplete);
-    if (needsLevelCheck) return LevelCheckScreen(api: api, userId: profile!.userId, focusSkills: profile!.focusSkills, onComplete: _onLevelComplete);
-    return HomeScreen(profile: profile, onSignOut: _onSignedOut, onAccountDeleted: _onAccountDeleted);
+    if (!profile!.profileComplete)
+      return OnboardingScreen(
+          api: api, profile: profile!, onComplete: _onOnboardingComplete);
+    if (needsLevelCheck)
+      return LevelCheckScreen(
+          api: api,
+          userId: profile!.userId,
+          focusSkills: profile!.focusSkills,
+          onComplete: _onLevelComplete);
+    return HomeScreen(
+        profile: profile,
+        onSignOut: _onSignedOut,
+        onAccountDeleted: _onAccountDeleted);
   }
 }
 

@@ -27,7 +27,8 @@ class HiwarStats {
   });
 
   factory HiwarStats.fromJson(Map<String, dynamic> json) {
-    final statistics = (json['statistics'] as Map?)?.cast<String, dynamic>() ?? {};
+    final statistics =
+        (json['statistics'] as Map?)?.cast<String, dynamic>() ?? {};
     return HiwarStats(
       userId: '${json['user_id'] ?? ''}',
       userName: '${json['user_name'] ?? 'معلوماتي في Hiwar'}',
@@ -56,7 +57,20 @@ class HiwarProfile {
   final int levelScore;
   final DateTime? createdAt;
 
-  const HiwarProfile({required this.userId, required this.name, this.email, this.age, this.educationLevel, this.certificates, this.learningReason, this.dailyMinutes, this.focusSkills, required this.profileComplete, required this.level, required this.levelScore, this.createdAt});
+  const HiwarProfile(
+      {required this.userId,
+      required this.name,
+      this.email,
+      this.age,
+      this.educationLevel,
+      this.certificates,
+      this.learningReason,
+      this.dailyMinutes,
+      this.focusSkills,
+      required this.profileComplete,
+      required this.level,
+      required this.levelScore,
+      this.createdAt});
 
   int get daysSinceJoined {
     if (createdAt == null) return 0;
@@ -65,20 +79,20 @@ class HiwarProfile {
   }
 
   factory HiwarProfile.fromJson(Map<String, dynamic> json) => HiwarProfile(
-    userId: '${json['user_id'] ?? ''}',
-    name: '${json['name'] ?? json['user_name'] ?? ''}',
-    email: json['email'] as String?,
-    age: (json['age'] as num?)?.toInt(),
-    educationLevel: json['education_level'] as String?,
-    certificates: json['certificates'] as String?,
-    learningReason: json['learning_reason'] as String?,
-    dailyMinutes: (json['daily_minutes'] as num?)?.toInt(),
-    focusSkills: json['focus_skills'] as String?,
-    profileComplete: json['profile_complete'] == true,
-    level: '${json['level'] ?? 'pending'}',
-    levelScore: (json['level_score'] as num?)?.toInt() ?? 0,
-    createdAt: DateTime.tryParse('${json['created_at'] ?? ''}'),
-  );
+        userId: '${json['user_id'] ?? ''}',
+        name: '${json['name'] ?? json['user_name'] ?? ''}',
+        email: json['email'] as String?,
+        age: (json['age'] as num?)?.toInt(),
+        educationLevel: json['education_level'] as String?,
+        certificates: json['certificates'] as String?,
+        learningReason: json['learning_reason'] as String?,
+        dailyMinutes: (json['daily_minutes'] as num?)?.toInt(),
+        focusSkills: json['focus_skills'] as String?,
+        profileComplete: json['profile_complete'] == true,
+        level: '${json['level'] ?? 'pending'}',
+        levelScore: (json['level_score'] as num?)?.toInt() ?? 0,
+        createdAt: DateTime.tryParse('${json['created_at'] ?? ''}'),
+      );
 }
 
 class HiwarError {
@@ -89,16 +103,23 @@ class HiwarError {
   final String errorType;
   final int count;
   final DateTime? lastOccurrence;
-  const HiwarError({this.id, required this.wrong, required this.correct, required this.explanation, required this.errorType, required this.count, this.lastOccurrence});
+  const HiwarError(
+      {this.id,
+      required this.wrong,
+      required this.correct,
+      required this.explanation,
+      required this.errorType,
+      required this.count,
+      this.lastOccurrence});
   factory HiwarError.fromJson(Map<String, dynamic> json) => HiwarError(
-    id: (json['id'] as num?)?.toInt(),
-    wrong: '${json['wrong'] ?? json['wrong_text'] ?? ''}',
-    correct: '${json['correct'] ?? json['correct_text'] ?? ''}',
-    explanation: '${json['explanation'] ?? ''}',
-    errorType: '${json['error_type'] ?? 'general'}',
-    count: (json['count'] as num?)?.toInt() ?? 1,
-    lastOccurrence: DateTime.tryParse('${json['last_occurrence'] ?? ''}'),
-  );
+        id: (json['id'] as num?)?.toInt(),
+        wrong: '${json['wrong'] ?? json['wrong_text'] ?? ''}',
+        correct: '${json['correct'] ?? json['correct_text'] ?? ''}',
+        explanation: '${json['explanation'] ?? ''}',
+        errorType: '${json['error_type'] ?? 'general'}',
+        count: (json['count'] as num?)?.toInt() ?? 1,
+        lastOccurrence: DateTime.tryParse('${json['last_occurrence'] ?? ''}'),
+      );
 }
 
 class HiwarJournalResult {
@@ -108,19 +129,28 @@ class HiwarJournalResult {
   final String followUpQuestion;
   final List<Map<String, String>> corrections;
 
-  const HiwarJournalResult({required this.id, required this.originalText, required this.correctedText, required this.followUpQuestion, required this.corrections});
+  const HiwarJournalResult(
+      {required this.id,
+      required this.originalText,
+      required this.correctedText,
+      required this.followUpQuestion,
+      required this.corrections});
 
-  factory HiwarJournalResult.fromJson(Map<String, dynamic> json) => HiwarJournalResult(
-    id: (json['id'] as num?)?.toInt() ?? 0,
-    originalText: '${json['original_text'] ?? ''}',
-    correctedText: '${json['corrected_text'] ?? ''}',
-    followUpQuestion: '${json['follow_up_question'] ?? ''}',
-    corrections: ((json['corrections'] as List?) ?? const []).whereType<Map>().map((item) => <String, String>{
-      'wrong': '${item['wrong'] ?? ''}',
-      'correct': '${item['correct'] ?? ''}',
-      'explanation': '${item['explanation'] ?? ''}',
-    }).toList(),
-  );
+  factory HiwarJournalResult.fromJson(Map<String, dynamic> json) =>
+      HiwarJournalResult(
+        id: (json['id'] as num?)?.toInt() ?? 0,
+        originalText: '${json['original_text'] ?? ''}',
+        correctedText: '${json['corrected_text'] ?? ''}',
+        followUpQuestion: '${json['follow_up_question'] ?? ''}',
+        corrections: ((json['corrections'] as List?) ?? const [])
+            .whereType<Map>()
+            .map((item) => <String, String>{
+                  'wrong': '${item['wrong'] ?? ''}',
+                  'correct': '${item['correct'] ?? ''}',
+                  'explanation': '${item['explanation'] ?? ''}',
+                })
+            .toList(),
+      );
 }
 
 class HiwarChatResult {
@@ -132,7 +162,14 @@ class HiwarChatResult {
   final bool analysisCompleted;
   final String? analysisMessage;
 
-  const HiwarChatResult({required this.reply, required this.corrections, required this.tips, this.conversationId, this.messageId, this.analysisCompleted = false, this.analysisMessage});
+  const HiwarChatResult(
+      {required this.reply,
+      required this.corrections,
+      required this.tips,
+      this.conversationId,
+      this.messageId,
+      this.analysisCompleted = false,
+      this.analysisMessage});
 
   factory HiwarChatResult.fromJson(Map<String, dynamic> json) {
     final rawCorrections = (json['corrections'] as List?) ?? const [];
@@ -164,11 +201,13 @@ class HiwarApi {
           receiveTimeout: const Duration(seconds: 45),
           headers: {'Content-Type': 'application/json'},
         )) {
-    _dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) async {
+    _dio.interceptors
+        .add(InterceptorsWrapper(onRequest: (options, handler) async {
       final path = options.path;
       if (!path.contains('/auth/')) {
         final token = await getAccessToken();
-        if (token != null && token.isNotEmpty) options.headers['Authorization'] = 'Bearer $token';
+        if (token != null && token.isNotEmpty)
+          options.headers['Authorization'] = 'Bearer $token';
       }
       handler.next(options);
     }));
@@ -183,7 +222,13 @@ class HiwarApi {
     final value = email.trim().toLowerCase();
     final re = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
     if (!re.hasMatch(value)) return false;
-    const reserved = {'example.com', 'example.org', 'example.net', 'test.com', 'localhost'};
+    const reserved = {
+      'example.com',
+      'example.org',
+      'example.net',
+      'test.com',
+      'localhost'
+    };
     return !reserved.contains(value.split('@').last);
   }
 
@@ -198,29 +243,39 @@ class HiwarApi {
         case DioExceptionType.connectionTimeout:
         case DioExceptionType.sendTimeout:
         case DioExceptionType.receiveTimeout:
-          return 'انتهت مهلة الاتصال بالخادم. تأكدي من تشغيل الـ Backend.';
+          return 'انتهت مهلة الاتصال بالخادم. تأكدي من تشغيله ثم أعدي المحاولة.';
         case DioExceptionType.connectionError:
-          return 'لا يمكن الوصول إلى الخادم (${error.requestOptions.uri.host}). تأكدي من تشغيل الـ Backend وAPI_BASE_URL.';
+          return 'لا يمكن الوصول إلى الخدمة الآن. تحققي من اتصال الإنترنت ثم حاولي مرة أخرى.';
         default:
           break;
       }
       final code = error.response?.statusCode;
-      if (code != null) return 'خطأ من الخادم (رمز $code)';
+      if (code != null) {
+        if (code >= 500) return 'حدث عطل مؤقت. حاولي مرة أخرى بعد قليل.';
+        return 'تعذر تنفيذ الطلب. تحققي من البيانات ثم حاولي مرة أخرى.';
+      }
     }
-    return error.toString();
+    return 'حدث خطأ غير متوقع. حاولي مرة أخرى.';
   }
 
   static String _apiBaseUrl() {
+    // Compile-time override works on web too (dotenv is not loaded on web).
+    final fromDefine = const String.fromEnvironment('API_BASE_URL');
+    if (fromDefine.trim().isNotEmpty) return fromDefine.trim();
     final configured = dotenv.isInitialized ? dotenv.env['API_BASE_URL'] : null;
-    if (configured != null && configured.trim().isNotEmpty) return configured.trim();
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) return 'http://10.0.2.2:8000';
+    if (configured != null && configured.trim().isNotEmpty)
+      return configured.trim();
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
+      return 'http://10.0.2.2:8000';
     return 'http://localhost:8000';
   }
 
   String get baseUrl => _dio.options.baseUrl;
 
-  Future<HiwarProfile> passwordSignIn({required String email, required String password}) async {
-    final response = await _dio.post('/api/v1/auth/password-sign-in', data: {'email': email, 'password': password});
+  Future<HiwarProfile> passwordSignIn(
+      {required String email, required String password}) async {
+    final response = await _dio.post('/api/v1/auth/password-sign-in',
+        data: {'email': email, 'password': password});
     final data = Map<String, dynamic>.from(response.data as Map);
     final token = data['access_token']?.toString();
     if (token != null && token.isNotEmpty) await saveAccessToken(token);
@@ -251,24 +306,31 @@ class HiwarApi {
     await prefs.remove('hiwar_voice_preference');
   }
 
-  Future<void> saveVoiceTimelineEntry({required String text, required int durationSeconds}) async {
+  Future<void> saveVoiceTimelineEntry(
+      {required String text, required int durationSeconds}) async {
     final prefs = await SharedPreferences.getInstance();
     final entries = prefs.getStringList('hiwar_voice_timeline') ?? <String>[];
     final stamp = DateTime.now().toIso8601String();
     entries.add('$stamp|$durationSeconds|${text.replaceAll('|', ' ')}');
-    await prefs.setStringList('hiwar_voice_timeline', entries.take(20).toList());
+    await prefs.setStringList(
+        'hiwar_voice_timeline', entries.take(20).toList());
   }
 
   Future<List<Map<String, String>>> getVoiceTimeline() async {
     final prefs = await SharedPreferences.getInstance();
-    return (prefs.getStringList('hiwar_voice_timeline') ?? const <String>[]).map((entry) {
-      final parts = entry.split('|');
-      return <String, String>{
-        'date': parts.isNotEmpty ? parts[0] : '',
-        'duration': parts.length > 1 ? parts[1] : '0',
-        'text': parts.length > 2 ? parts.sublist(2).join('|') : '',
-      };
-    }).where((entry) => (entry['text'] ?? '').trim().isNotEmpty).toList().reversed.toList();
+    return (prefs.getStringList('hiwar_voice_timeline') ?? const <String>[])
+        .map((entry) {
+          final parts = entry.split('|');
+          return <String, String>{
+            'date': parts.isNotEmpty ? parts[0] : '',
+            'duration': parts.length > 1 ? parts[1] : '0',
+            'text': parts.length > 2 ? parts.sublist(2).join('|') : '',
+          };
+        })
+        .where((entry) => (entry['text'] ?? '').trim().isNotEmpty)
+        .toList()
+        .reversed
+        .toList();
   }
 
   Future<String> getVoicePreference() async {
@@ -281,76 +343,144 @@ class HiwarApi {
     await prefs.setString('hiwar_voice_preference', preference);
   }
 
-  Future<Map<String, dynamic>> signUp({required String name, required String email, required String password}) async {
-    final response = await _dio.post('/api/v1/auth/sign-up', data: {'name': name, 'email': email, 'password': password});
+  Future<Map<String, dynamic>> signUp(
+      {required String name,
+      required String email,
+      required String password}) async {
+    final response = await _dio.post('/api/v1/auth/sign-up',
+        data: {'name': name, 'email': email, 'password': password});
     return Map<String, dynamic>.from(response.data as Map);
   }
 
-  Future<HiwarProfile> verifyEmail({required String email, required String code}) async {
-    final response = await _dio.post('/api/v1/auth/verify-email', data: {'email': email, 'code': code});
+  Future<HiwarProfile> verifyEmail(
+      {required String email, required String code}) async {
+    final response = await _dio.post('/api/v1/auth/verify-email',
+        data: {'email': email, 'code': code});
     final data = Map<String, dynamic>.from(response.data as Map);
     final token = data['access_token']?.toString();
     if (token != null && token.isNotEmpty) await saveAccessToken(token);
     return HiwarProfile.fromJson(data);
   }
 
-  Future<HiwarProfile> signIn({required String userId, required String name, String? email, String provider = 'manual', String? subject, String? idToken}) async {
-    final response = await _dio.post('/api/v1/auth/sign-in', data: {'user_id': userId, 'name': name, 'email': email, 'auth_provider': provider, 'auth_subject': subject, 'id_token': idToken});
+  Future<HiwarProfile> signIn(
+      {required String userId,
+      required String name,
+      String? email,
+      String provider = 'manual',
+      String? subject,
+      String? idToken}) async {
+    final response = await _dio.post('/api/v1/auth/sign-in', data: {
+      'user_id': userId,
+      'name': name,
+      'email': email,
+      'auth_provider': provider,
+      'auth_subject': subject,
+      'id_token': idToken
+    });
     final data = Map<String, dynamic>.from(response.data as Map);
     final token = data['access_token']?.toString();
     if (token != null && token.isNotEmpty) await saveAccessToken(token);
     return HiwarProfile.fromJson(data);
   }
 
-  Future<Map<String, dynamic>> assessReading({required String userId, required String passage, required String answer}) async {
-    final response = await _dio.post('/api/v1/assessment/reading', data: {'user_id': userId, 'passage': passage, 'answer': answer});
+  Future<Map<String, dynamic>> assessReading(
+      {required String userId,
+      required String passage,
+      required String answer}) async {
+    final response = await _dio.post('/api/v1/assessment/reading',
+        data: {'user_id': userId, 'passage': passage, 'answer': answer});
     return Map<String, dynamic>.from(response.data as Map);
   }
 
-  Future<Map<String, dynamic>> assessSpeaking({required String userId, required String prompt, required String transcript}) async {
-    final response = await _dio.post('/api/v1/assessment/speaking', data: {'user_id': userId, 'prompt': prompt, 'transcript': transcript});
+  Future<Map<String, dynamic>> assessSpeaking(
+      {required String userId,
+      required String prompt,
+      required String transcript}) async {
+    final response = await _dio.post('/api/v1/assessment/speaking',
+        data: {'user_id': userId, 'prompt': prompt, 'transcript': transcript});
     return Map<String, dynamic>.from(response.data as Map);
   }
 
-  Future<void> saveLevelResult({required String userId, required String level, required int score}) async {
-    await _dio.post('/api/v1/assessment/level', data: {'user_id': userId, 'level': level, 'score': score});
+  Future<void> saveLevelResult(
+      {required String userId,
+      required String level,
+      required int score}) async {
+    await _dio.post('/api/v1/assessment/level',
+        data: {'user_id': userId, 'level': level, 'score': score});
   }
 
   Future<List<HiwarError>> getErrors(String userId) async {
-    final response = await _dio.get('/api/v1/errors/${Uri.encodeComponent(userId)}');
+    final response =
+        await _dio.get('/api/v1/errors/${Uri.encodeComponent(userId)}');
     final data = Map<String, dynamic>.from(response.data as Map);
-    return ((data['errors'] as List?) ?? const []).map((item) => HiwarError.fromJson(Map<String, dynamic>.from(item as Map))).toList();
+    return ((data['errors'] as List?) ?? const [])
+        .map((item) =>
+            HiwarError.fromJson(Map<String, dynamic>.from(item as Map)))
+        .toList();
   }
 
-  Future<HiwarChatResult> sendChat({required String userId, required String message, int? conversationId, String? tutorInstruction}) async {
+  Future<HiwarChatResult> sendChat(
+      {required String userId,
+      required String message,
+      int? conversationId,
+      String? tutorInstruction}) async {
     final response = await _dio.post('/api/v1/chat', data: {
       'message': message,
       'user_id': userId,
       if (conversationId != null) 'conversation_id': conversationId,
-      if (tutorInstruction != null && tutorInstruction.trim().isNotEmpty) 'tutor_instruction': tutorInstruction.trim(),
+      if (tutorInstruction != null && tutorInstruction.trim().isNotEmpty)
+        'tutor_instruction': tutorInstruction.trim(),
     });
-    return HiwarChatResult.fromJson(Map<String, dynamic>.from(response.data as Map));
+    return HiwarChatResult.fromJson(
+        Map<String, dynamic>.from(response.data as Map));
   }
 
-  Future<HiwarJournalResult> analyzeJournal({required String userId, required String text}) async {
-    final response = await _dio.post('/api/v1/journal/analyze', data: {'user_id': userId, 'text': text});
-    return HiwarJournalResult.fromJson(Map<String, dynamic>.from(response.data as Map));
+  Future<HiwarJournalResult> analyzeJournal(
+      {required String userId, required String text}) async {
+    final response = await _dio.post('/api/v1/journal/analyze',
+        data: {'user_id': userId, 'text': text});
+    return HiwarJournalResult.fromJson(
+        Map<String, dynamic>.from(response.data as Map));
   }
 
   Future<List<Map<String, dynamic>>> getJournal(String userId) async {
-    final response = await _dio.get('/api/v1/journal/${Uri.encodeComponent(userId)}');
+    final response =
+        await _dio.get('/api/v1/journal/${Uri.encodeComponent(userId)}');
     final data = Map<String, dynamic>.from(response.data as Map);
-    return ((data['entries'] as List?) ?? const []).whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+    return ((data['entries'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
   }
 
   Future<HiwarProfile> getProfile(String userId) async {
-    final response = await _dio.get('/api/v1/profile/${Uri.encodeComponent(userId)}');
-    return HiwarProfile.fromJson(Map<String, dynamic>.from(response.data as Map));
+    final response =
+        await _dio.get('/api/v1/profile/${Uri.encodeComponent(userId)}');
+    return HiwarProfile.fromJson(
+        Map<String, dynamic>.from(response.data as Map));
   }
 
-  Future<HiwarProfile> updateProfile({required String userId, required String name, int? age, String? educationLevel, String? certificates, String? learningReason, int? dailyMinutes, String? focusSkills}) async {
-    final response = await _dio.put('/api/v1/profile', data: {'user_id': userId, 'name': name, 'age': age, 'education_level': educationLevel, 'certificates': certificates, 'learning_reason': learningReason, 'daily_minutes': dailyMinutes, 'focus_skills': focusSkills});
-    return HiwarProfile.fromJson(Map<String, dynamic>.from(response.data as Map));
+  Future<HiwarProfile> updateProfile(
+      {required String userId,
+      required String name,
+      int? age,
+      String? educationLevel,
+      String? certificates,
+      String? learningReason,
+      int? dailyMinutes,
+      String? focusSkills}) async {
+    final response = await _dio.put('/api/v1/profile', data: {
+      'user_id': userId,
+      'name': name,
+      'age': age,
+      'education_level': educationLevel,
+      'certificates': certificates,
+      'learning_reason': learningReason,
+      'daily_minutes': dailyMinutes,
+      'focus_skills': focusSkills
+    });
+    return HiwarProfile.fromJson(
+        Map<String, dynamic>.from(response.data as Map));
   }
 
   Future<String?> getStoredUserId() async {
@@ -362,7 +492,8 @@ class HiwarApi {
     final prefs = await SharedPreferences.getInstance();
     var userId = prefs.getString('hiwar_user_id');
     if (userId == null || userId.trim().isEmpty) {
-      userId = 'flutter-${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}';
+      userId =
+          'flutter-${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}';
       await prefs.setString('hiwar_user_id', userId);
     }
     return userId;
@@ -377,7 +508,8 @@ class HiwarApi {
 
   Future<bool> hasSeenWelcome() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('hiwar_welcome_seen') == true && prefs.getInt('hiwar_welcome_version') == _welcomeVersion;
+    return prefs.getBool('hiwar_welcome_seen') == true &&
+        prefs.getInt('hiwar_welcome_version') == _welcomeVersion;
   }
 
   Future<void> markWelcomeSeen() async {
@@ -389,20 +521,30 @@ class HiwarApi {
   // -------- Conversations / suggestion / review / TTS --------
 
   Future<List<Map<String, dynamic>>> getConversations(String userId) async {
-    final response = await _dio.get('/api/v1/conversations/${Uri.encodeComponent(userId)}');
+    final response =
+        await _dio.get('/api/v1/conversations/${Uri.encodeComponent(userId)}');
     final data = Map<String, dynamic>.from(response.data as Map);
-    return ((data['conversations'] as List?) ?? const []).whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+    return ((data['conversations'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
   }
 
-  Future<List<Map<String, dynamic>>> getConversationMessages(String userId, int conversationId) async {
-    final response = await _dio.get('/api/v1/conversations/${Uri.encodeComponent(userId)}/$conversationId');
+  Future<List<Map<String, dynamic>>> getConversationMessages(
+      String userId, int conversationId) async {
+    final response = await _dio.get(
+        '/api/v1/conversations/${Uri.encodeComponent(userId)}/$conversationId');
     final data = Map<String, dynamic>.from(response.data as Map);
-    return ((data['messages'] as List?) ?? const []).whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+    return ((data['messages'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
   }
 
   Future<String?> getSmartSuggestion(String userId) async {
     try {
-      final response = await _dio.get('/api/v1/suggestion/${Uri.encodeComponent(userId)}');
+      final response =
+          await _dio.get('/api/v1/suggestion/${Uri.encodeComponent(userId)}');
       final data = Map<String, dynamic>.from(response.data as Map);
       if (data['has_suggestion'] != true) return null;
       return '${data['text'] ?? ''}';
@@ -412,17 +554,26 @@ class HiwarApi {
   }
 
   Future<List<HiwarError>> getReviewQueue(String userId) async {
-    final response = await _dio.get('/api/v1/review/${Uri.encodeComponent(userId)}');
+    final response =
+        await _dio.get('/api/v1/review/${Uri.encodeComponent(userId)}');
     final data = Map<String, dynamic>.from(response.data as Map);
-    return ((data['errors'] as List?) ?? const []).map((item) => HiwarError.fromJson(Map<String, dynamic>.from(item as Map))).toList();
+    return ((data['errors'] as List?) ?? const [])
+        .map((item) =>
+            HiwarError.fromJson(Map<String, dynamic>.from(item as Map)))
+        .toList();
   }
 
-  Future<void> answerReview({required String userId, required int errorId, required bool remembered}) async {
-    await _dio.post('/api/v1/review/${Uri.encodeComponent(userId)}/answer', data: {'error_id': errorId, 'remembered': remembered});
+  Future<void> answerReview(
+      {required String userId,
+      required int errorId,
+      required bool remembered}) async {
+    await _dio.post('/api/v1/review/${Uri.encodeComponent(userId)}/answer',
+        data: {'error_id': errorId, 'remembered': remembered});
   }
 
-  /// يرجع bytes الصوت من ElevenLabs عبر الـ Backend، أو null إذا غير مهيأ.
-  Future<List<int>?> synthesizeSpeech({required String text, String voice = 'female'}) async {
+  /// يرجع bytes الصوت من ElevenLabs عبر الخادم، أو null إذا غير مهيأ.
+  Future<List<int>?> synthesizeSpeech(
+      {required String text, String voice = 'female'}) async {
     try {
       final response = await _dio.post(
         '/api/v1/tts',
@@ -433,21 +584,24 @@ class HiwarApi {
       if (bytes is List<int> && bytes.isNotEmpty) return bytes;
       return null;
     } on DioException catch (error) {
-      if (error.response?.statusCode == 503) return null; // fallback إلى الصوت المحلي
+      if (error.response?.statusCode == 503)
+        return null; // fallback إلى الصوت المحلي
       rethrow;
     }
   }
 
   Future<HiwarStats> getStats(String userId) async {
     try {
-      final response = await _dio.get('/api/v1/stats/${Uri.encodeComponent(userId)}');
+      final response =
+          await _dio.get('/api/v1/stats/${Uri.encodeComponent(userId)}');
       final data = Map<String, dynamic>.from(response.data as Map);
       if (data['error'] != null) throw Exception('${data['error']}');
       return HiwarStats.fromJson(data);
     } on DioException catch (error) {
       final code = error.response?.statusCode;
-      if (code == 404) throw Exception('لم يتم العثور على هذا المستخدم في قاعدة البيانات.');
-      throw Exception('تعذر الاتصال بالـ Backend. تأكدي من تشغيل Hiwar وإعداد API_BASE_URL.');
+      if (code == 404)
+        throw Exception('لم يتم العثور على هذا المستخدم في قاعدة البيانات.');
+      throw Exception('تعذر الاتصال بالخدمة الآن. حاولي مرة أخرى.');
     }
   }
 }

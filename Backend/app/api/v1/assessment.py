@@ -93,7 +93,7 @@ Answer: {request.answer}
 Return JSON with keys: score (0-100), level (A1/A2/B1/B2/C1), feedback (Arabic), difficult_words (array of strings), pronunciation_help (array of objects with word and pronunciation).""")
     if result is not None:
         return result
-    return {"score": 0, "level": "pending", "feedback": "تحليل القراءة يحتاج تشغيل AI Backend.", "difficult_words": [], "pronunciation_help": []}
+    return {"score": 0, "level": "pending", "feedback": "تحليل القراءة يحتاج تفعيل مزود الذكاء الاصطناعي.", "difficult_words": [], "pronunciation_help": []}
 
 
 @router.post("/assessment/speaking")
@@ -105,7 +105,7 @@ Transcript: {request.transcript}
 Return JSON with keys: estimated_level (A1/A2/B1/B2/C1), overall_score (0-100), grammar_score, vocabulary_score, fluency_score, sentence_structure_score, naturalness_score, feedback (Arabic), corrections (array with wrong, correct, explanation). Do not claim to assess pronunciation from text alone; set pronunciation_note accordingly.""")
     if result is not None:
         return result
-    return {"estimated_level": "pending", "overall_score": 0, "feedback": "تحليل التحدث يحتاج تشغيل AI Backend.", "corrections": [], "pronunciation_note": "لا يمكن تقييم النطق من النص وحده."}
+    return {"estimated_level": "pending", "overall_score": 0, "feedback": "تحليل التحدث يحتاج تفعيل مزود الذكاء الاصطناعي.", "corrections": [], "pronunciation_note": "لا يمكن تقييم النطق من النص وحده."}
 
 
 @router.post("/assessment/level")

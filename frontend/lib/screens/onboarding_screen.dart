@@ -15,7 +15,11 @@ class OnboardingScreen extends StatefulWidget {
   final HiwarApi api;
   final HiwarProfile profile;
   final ValueChanged<HiwarProfile> onComplete;
-  const OnboardingScreen({super.key, required this.api, required this.profile, required this.onComplete});
+  const OnboardingScreen(
+      {super.key,
+      required this.api,
+      required this.profile,
+      required this.onComplete});
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -23,7 +27,8 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   late final PageController pages = PageController();
-  late final TextEditingController name = TextEditingController(text: widget.profile.name);
+  late final TextEditingController name =
+      TextEditingController(text: widget.profile.name);
   final age = TextEditingController();
   int step = 0;
   bool busy = false;
@@ -60,7 +65,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
-  TextStyle ar(double size, {FontWeight weight = FontWeight.w400, Color color = _ink}) => GoogleFonts.ibmPlexSansArabic(fontSize: size, fontWeight: weight, color: color);
+  TextStyle ar(double size,
+          {FontWeight weight = FontWeight.w400, Color color = _ink}) =>
+      GoogleFonts.ibmPlexSansArabic(
+          fontSize: size, fontWeight: weight, color: color);
 
   void goNext() {
     if (step == 0 && name.text.trim().isEmpty) {
@@ -80,11 +88,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       return;
     }
     setState(() => error = null);
-    pages.nextPage(duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic);
+    pages.nextPage(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic);
   }
 
   Future<void> save() async {
-    setState(() { busy = true; error = null; });
+    setState(() {
+      busy = true;
+      error = null;
+    });
     try {
       final updated = await widget.api.updateProfile(
         userId: widget.profile.userId,
@@ -97,7 +110,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
       if (mounted) widget.onComplete(updated);
     } catch (_) {
-      if (mounted) setState(() { busy = false; error = 'تعذر حفظ معلوماتك. تأكد من تشغيل Backend.'; });
+      if (mounted)
+        setState(() {
+          busy = false;
+          error = 'تعذر حفظ معلوماتك. تأكد من اتصالك بالخادم ثم أعد المحاولة.';
+        });
     }
   }
 
@@ -107,38 +124,104 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: _bg,
-        appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0, title: Text('خلّينا نتعرف عليك', style: ar(16, weight: FontWeight.w700))),
+        appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            title: Text('خلّينا نتعرف عليك',
+                style: ar(16, weight: FontWeight.w700))),
         body: Column(children: [
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Column(children: [
-            Row(
-              children: List.generate(
-                4,
-                (i) => Expanded(
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    height: 5,
-                    margin: EdgeInsets.only(left: i == 3 ? 0 : 6),
-                    decoration: BoxDecoration(
-                      color: i <= step ? _primary : _line,
-                      borderRadius: BorderRadius.circular(5),
+          Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(children: [
+                Row(
+                  children: List.generate(
+                    4,
+                    (i) => Expanded(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        height: 5,
+                        margin: EdgeInsets.only(left: i == 3 ? 0 : 6),
+                        decoration: BoxDecoration(
+                          color: i <= step ? _primary : _line,
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Align(alignment: Alignment.centerRight, child: Text('الخطوة ${step + 1} من 4', style: ar(11, color: _faint))),
-          ])),
-          Expanded(child: PageView(controller: pages, physics: const NeverScrollableScrollPhysics(), onPageChanged: (value) => setState(() { step = value; error = null; }), children: [
-            _BasicStep(name: name, age: age, education: education, onEducation: (value) => setState(() => education = value)),
-            _OptionsStep(title: 'ليش تبي تتعلم إنجليزي؟', subtitle: 'اختار كل الأشياء اللي تناسبك.', options: goalOptions, selected: goals, onToggle: (value) => setState(() { goals.contains(value) ? goals.remove(value) : goals.add(value); })),
-            _MinutesStep(value: dailyMinutes, onChanged: (value) => setState(() => dailyMinutes = value)),
-            _OptionsStep(title: 'وش أكثر شيء تحتاج تطوره؟', subtitle: 'اختار أكثر من مهارة، أو خلي الذكاء الاصطناعي يحدد لك.', options: skillOptions, selected: skills, onToggle: (value) => setState(() { skills.contains(value) ? skills.remove(value) : skills.add(value); })),
-          ])),
-          Padding(padding: const EdgeInsets.fromLTRB(20, 8, 20, 24), child: Column(children: [
-            if (error != null) Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(error!, textAlign: TextAlign.center, style: ar(12, color: const Color(0xFFB23B3B)))),
-            SizedBox(width: double.infinity, child: FilledButton(onPressed: busy ? null : goNext, style: FilledButton.styleFrom(backgroundColor: _primary, padding: const EdgeInsets.all(16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), child: Text(busy ? 'جارٍ الحفظ...' : step == 3 ? 'احفظ وابدأ تحديد مستواك' : 'التالي', style: ar(14, weight: FontWeight.w700, color: Colors.white)))),
-          ])),
+                const SizedBox(height: 10),
+                Align(
+                    alignment: Alignment.centerRight,
+                    child: Text('الخطوة ${step + 1} من 4',
+                        style: ar(11, color: _faint))),
+              ])),
+          Expanded(
+              child: PageView(
+                  controller: pages,
+                  physics: const NeverScrollableScrollPhysics(),
+                  onPageChanged: (value) => setState(() {
+                        step = value;
+                        error = null;
+                      }),
+                  children: [
+                _BasicStep(
+                    name: name,
+                    age: age,
+                    education: education,
+                    onEducation: (value) => setState(() => education = value)),
+                _OptionsStep(
+                    title: 'ليش تبي تتعلم إنجليزي؟',
+                    subtitle: 'اختار كل الأشياء اللي تناسبك.',
+                    options: goalOptions,
+                    selected: goals,
+                    onToggle: (value) => setState(() {
+                          goals.contains(value)
+                              ? goals.remove(value)
+                              : goals.add(value);
+                        })),
+                _MinutesStep(
+                    value: dailyMinutes,
+                    onChanged: (value) => setState(() => dailyMinutes = value)),
+                _OptionsStep(
+                    title: 'وش أكثر شيء تحتاج تطوره؟',
+                    subtitle:
+                        'اختار أكثر من مهارة، أو خلي الذكاء الاصطناعي يحدد لك.',
+                    options: skillOptions,
+                    selected: skills,
+                    onToggle: (value) => setState(() {
+                          skills.contains(value)
+                              ? skills.remove(value)
+                              : skills.add(value);
+                        })),
+              ])),
+          Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+              child: Column(children: [
+                if (error != null)
+                  Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Text(error!,
+                          textAlign: TextAlign.center,
+                          style: ar(12, color: const Color(0xFFB23B3B)))),
+                SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                        onPressed: busy ? null : goNext,
+                        style: FilledButton.styleFrom(
+                            backgroundColor: _primary,
+                            padding: const EdgeInsets.all(16),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15))),
+                        child: Text(
+                            busy
+                                ? 'جارٍ الحفظ...'
+                                : step == 3
+                                    ? 'احفظ وابدأ تحديد مستواك'
+                                    : 'التالي',
+                            style: ar(14,
+                                weight: FontWeight.w700,
+                                color: Colors.white)))),
+              ])),
         ]),
       ),
     );
@@ -150,52 +233,84 @@ class _BasicStep extends StatelessWidget {
   final TextEditingController age;
   final String education;
   final ValueChanged<String> onEducation;
-  const _BasicStep({required this.name, required this.age, required this.education, required this.onEducation});
+  const _BasicStep(
+      {required this.name,
+      required this.age,
+      required this.education,
+      required this.onEducation});
   @override
   Widget build(BuildContext context) {
-    final ar = (double size, {FontWeight weight = FontWeight.w400, Color color = _ink}) => GoogleFonts.ibmPlexSansArabic(fontSize: size, fontWeight: weight, color: color);
-    return ListView(padding: const EdgeInsets.fromLTRB(20, 16, 20, 20), children: [
-      Text('أول خطوة، نعرفك أكثر', style: ar(20, weight: FontWeight.w800)),
-      const SizedBox(height: 7),
-      Text('معلومات بسيطة تساعدنا نخلي التجربة مناسبة لك.', style: ar(13, color: _faint)),
-      const SizedBox(height: 24),
-      _Field(controller: name, label: 'اسمك', hint: 'مثال: نورة'),
-      const SizedBox(height: 12),
-      _Field(controller: age, label: 'العمر', hint: 'اختياري', keyboard: TextInputType.number),
-      const SizedBox(height: 18),
-      Text('كيف تصف مستواك بشكل مبدئي؟', style: ar(13, weight: FontWeight.w700)),
-      const SizedBox(height: 12),
-      ...['مبتدئ', 'أساسي', 'متوسط', 'متقدم'].map((item) {
-        final selected = item == education;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: InkWell(
-            onTap: () => onEducation(item),
-            borderRadius: BorderRadius.circular(16),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-              decoration: BoxDecoration(
-                color: selected ? _tint : Colors.white,
+    final ar = (double size,
+            {FontWeight weight = FontWeight.w400, Color color = _ink}) =>
+        GoogleFonts.ibmPlexSansArabic(
+            fontSize: size, fontWeight: weight, color: color);
+    return ListView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+        children: [
+          Text('أول خطوة، نعرفك أكثر', style: ar(20, weight: FontWeight.w800)),
+          const SizedBox(height: 7),
+          Text('معلومات بسيطة تساعدنا نخلي التجربة مناسبة لك.',
+              style: ar(13, color: _faint)),
+          const SizedBox(height: 24),
+          _Field(controller: name, label: 'اسمك', hint: 'مثال: نورة'),
+          const SizedBox(height: 12),
+          _Field(
+              controller: age,
+              label: 'العمر',
+              hint: 'اختياري',
+              keyboard: TextInputType.number),
+          const SizedBox(height: 18),
+          Text('كيف تصف مستواك بشكل مبدئي؟',
+              style: ar(13, weight: FontWeight.w700)),
+          const SizedBox(height: 12),
+          ...['مبتدئ', 'أساسي', 'متوسط', 'متقدم'].map((item) {
+            final selected = item == education;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: InkWell(
+                onTap: () => onEducation(item),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: selected ? _primary : _line, width: selected ? 1.5 : 1),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(.025), blurRadius: 10, offset: const Offset(0, 4))],
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                  decoration: BoxDecoration(
+                    color: selected ? _tint : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                        color: selected ? _primary : _line,
+                        width: selected ? 1.5 : 1),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withOpacity(.025),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4))
+                    ],
+                  ),
+                  child: Row(children: [
+                    Text(_optionEmoji(item),
+                        style: const TextStyle(fontSize: 24)),
+                    const SizedBox(width: 13),
+                    Expanded(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                          Text(item, style: ar(14, weight: FontWeight.w700)),
+                          const SizedBox(height: 3),
+                          Text(_levelDescription(item),
+                              style: ar(11.5, color: _faint)),
+                        ])),
+                    Icon(
+                        selected
+                            ? Icons.radio_button_checked_rounded
+                            : Icons.radio_button_off_rounded,
+                        color: selected ? _primary : _faint),
+                  ]),
+                ),
               ),
-              child: Row(children: [
-                Text(_optionEmoji(item), style: const TextStyle(fontSize: 24)),
-                const SizedBox(width: 13),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(item, style: ar(14, weight: FontWeight.w700)),
-                  const SizedBox(height: 3),
-                  Text(_levelDescription(item), style: ar(11.5, color: _faint)),
-                ])),
-                Icon(selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: selected ? _primary : _faint),
-              ]),
-            ),
-          ),
-        );
-      }),
-    ]);
+            );
+          }),
+        ]);
   }
 }
 
@@ -205,42 +320,67 @@ class _OptionsStep extends StatelessWidget {
   final List<String> options;
   final Set<String> selected;
   final ValueChanged<String> onToggle;
-  const _OptionsStep({required this.title, required this.subtitle, required this.options, required this.selected, required this.onToggle});
+  const _OptionsStep(
+      {required this.title,
+      required this.subtitle,
+      required this.options,
+      required this.selected,
+      required this.onToggle});
   @override
   Widget build(BuildContext context) {
-    final ar = (double size, {FontWeight weight = FontWeight.w400, Color color = _ink}) => GoogleFonts.ibmPlexSansArabic(fontSize: size, fontWeight: weight, color: color);
-    return ListView(padding: const EdgeInsets.fromLTRB(20, 16, 20, 20), children: [
-      Text(title, style: ar(20, weight: FontWeight.w800)),
-      const SizedBox(height: 7),
-      Text(subtitle, style: ar(13, color: _faint)),
-      const SizedBox(height: 20),
-      ...options.map((item) {
-        final isSelected = selected.contains(item);
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: InkWell(
-            onTap: () => onToggle(item),
-            borderRadius: BorderRadius.circular(16),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
-              decoration: BoxDecoration(
-                color: isSelected ? _tint : Colors.white,
-                border: Border.all(color: isSelected ? _primary : _line, width: isSelected ? 1.5 : 1),
+    final ar = (double size,
+            {FontWeight weight = FontWeight.w400, Color color = _ink}) =>
+        GoogleFonts.ibmPlexSansArabic(
+            fontSize: size, fontWeight: weight, color: color);
+    return ListView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+        children: [
+          Text(title, style: ar(20, weight: FontWeight.w800)),
+          const SizedBox(height: 7),
+          Text(subtitle, style: ar(13, color: _faint)),
+          const SizedBox(height: 20),
+          ...options.map((item) {
+            final isSelected = selected.contains(item);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: InkWell(
+                onTap: () => onToggle(item),
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(.025), blurRadius: 10, offset: const Offset(0, 4))],
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                  decoration: BoxDecoration(
+                    color: isSelected ? _tint : Colors.white,
+                    border: Border.all(
+                        color: isSelected ? _primary : _line,
+                        width: isSelected ? 1.5 : 1),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withOpacity(.025),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4))
+                    ],
+                  ),
+                  child: Row(children: [
+                    Text(_optionEmoji(item),
+                        style: const TextStyle(fontSize: 22)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child:
+                            Text(item, style: ar(13, weight: FontWeight.w700))),
+                    Icon(
+                        isSelected
+                            ? Icons.check_circle_rounded
+                            : Icons.circle_outlined,
+                        color: isSelected ? _primary : _faint),
+                  ]),
+                ),
               ),
-              child: Row(children: [
-                Text(_optionEmoji(item), style: const TextStyle(fontSize: 22)),
-                const SizedBox(width: 12),
-                Expanded(child: Text(item, style: ar(13, weight: FontWeight.w700))),
-                Icon(isSelected ? Icons.check_circle_rounded : Icons.circle_outlined, color: isSelected ? _primary : _faint),
-              ]),
-            ),
-          ),
-        );
-      }),
-    ]);
+            );
+          }),
+        ]);
   }
 }
 
@@ -306,49 +446,71 @@ class _MinutesStep extends StatelessWidget {
   const _MinutesStep({required this.value, required this.onChanged});
   @override
   Widget build(BuildContext context) {
-    final ar = (double size, {FontWeight weight = FontWeight.w400, Color color = _ink}) => GoogleFonts.ibmPlexSansArabic(fontSize: size, fontWeight: weight, color: color);
+    final ar = (double size,
+            {FontWeight weight = FontWeight.w400, Color color = _ink}) =>
+        GoogleFonts.ibmPlexSansArabic(
+            fontSize: size, fontWeight: weight, color: color);
     const options = <Map<String, dynamic>>[
       {'label': '5–10 دقائق', 'value': 10, 'icon': Icons.bolt_outlined},
       {'label': '10–20 دقيقة', 'value': 20, 'icon': Icons.timer_outlined},
-      {'label': '20–30 دقيقة', 'value': 30, 'icon': Icons.local_fire_department_outlined},
-      {'label': 'أكثر من 30 دقيقة', 'value': 45, 'icon': Icons.rocket_launch_outlined},
+      {
+        'label': '20–30 دقيقة',
+        'value': 30,
+        'icon': Icons.local_fire_department_outlined
+      },
+      {
+        'label': 'أكثر من 30 دقيقة',
+        'value': 45,
+        'icon': Icons.rocket_launch_outlined
+      },
     ];
-    return ListView(padding: const EdgeInsets.fromLTRB(20, 16, 20, 20), children: [
-      Text('كم دقيقة تقدر تتعلم يوميًا؟', style: ar(20, weight: FontWeight.w800)),
-      const SizedBox(height: 7),
-      Text('نستخدمها عشان نبني لك خطة واقعية وما تضغط عليك.', style: ar(13, color: _faint)),
-      const SizedBox(height: 22),
-      ...options.map((item) {
-        final selected = value == item['value'];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: InkWell(
-            onTap: () => onChanged(item['value'] as int),
-            borderRadius: BorderRadius.circular(15),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: selected ? _tint : Colors.white,
-                border: Border.all(
-                  color: selected ? _primary : _line,
-                  width: selected ? 1.5 : 1,
-                ),
+    return ListView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+        children: [
+          Text('كم دقيقة تقدر تتعلم يوميًا؟',
+              style: ar(20, weight: FontWeight.w800)),
+          const SizedBox(height: 7),
+          Text('نستخدمها عشان نبني لك خطة واقعية وما تضغط عليك.',
+              style: ar(13, color: _faint)),
+          const SizedBox(height: 22),
+          ...options.map((item) {
+            final selected = value == item['value'];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: InkWell(
+                onTap: () => onChanged(item['value'] as int),
                 borderRadius: BorderRadius.circular(15),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  padding: const EdgeInsets.all(15),
+                  decoration: BoxDecoration(
+                    color: selected ? _tint : Colors.white,
+                    border: Border.all(
+                      color: selected ? _primary : _line,
+                      width: selected ? 1.5 : 1,
+                    ),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(item['icon'] as IconData,
+                          color: selected ? _primary : _faint),
+                      const SizedBox(width: 12),
+                      Expanded(
+                          child: Text(item['label'] as String,
+                              style: ar(13, weight: FontWeight.w600))),
+                      Icon(
+                          selected
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_off,
+                          color: selected ? _primary : _faint),
+                    ],
+                  ),
+                ),
               ),
-              child: Row(
-                children: [
-                  Icon(item['icon'] as IconData, color: selected ? _primary : _faint),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text(item['label'] as String, style: ar(13, weight: FontWeight.w600))),
-                  Icon(selected ? Icons.radio_button_checked : Icons.radio_button_off, color: selected ? _primary : _faint),
-                ],
-              ),
-            ),
-          ),
-        );
-      }),
-    ]);
+            );
+          }),
+        ]);
   }
 }
 
@@ -357,7 +519,24 @@ class _Field extends StatelessWidget {
   final String label;
   final String hint;
   final TextInputType keyboard;
-  const _Field({required this.controller, required this.label, required this.hint, this.keyboard = TextInputType.text});
+  const _Field(
+      {required this.controller,
+      required this.label,
+      required this.hint,
+      this.keyboard = TextInputType.text});
   @override
-  Widget build(BuildContext context) => TextField(controller: controller, keyboardType: keyboard, decoration: InputDecoration(labelText: label, hintText: hint, filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _line)), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _line))));
+  Widget build(BuildContext context) => TextField(
+      controller: controller,
+      keyboardType: keyboard,
+      decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: _line)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: _line))));
 }

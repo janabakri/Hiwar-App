@@ -17,8 +17,8 @@ dependencies:
   google_sign_in: ^6.2.1
   sign_in_with_apple: ^6.1.4
   shimmer: ^3.0.0
-  speech_to_text: ^6.6.0
-  flutter_tts: ^3.8.0
+  speech_to_text: ^7.4.0
+  flutter_tts: ^4.2.5
   video_player: ^2.9.2
   share_plus: ^10.1.4
   flutter_local_notifications: ^17.2.3

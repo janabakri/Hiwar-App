@@ -4,6 +4,7 @@ Chat API endpoints with database integration.
 
 import json
 import logging
+import time
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -91,13 +92,32 @@ def _generate_gemini(prompt: str) -> str:
             },
         },
     }
-    response = httpx.post(
-        url,
-        params={"key": settings.GEMINI_API_KEY},
-        json=payload,
-        timeout=60.0,
-    )
-    response.raise_for_status()
+    # Google occasionally returns 503 (overloaded) or the connection drops.
+    # Retry transient failures before giving up so the user sees a real reply
+    # instead of a spurious "invalid key" message.
+    last_error: Optional[Exception] = None
+    for attempt in range(3):
+        try:
+            response = httpx.post(
+                url,
+                params={"key": settings.GEMINI_API_KEY},
+                json=payload,
+                timeout=60.0,
+            )
+            if response.status_code in (429, 500, 502, 503, 504):
+                raise httpx.HTTPStatusError(
+                    f"transient {response.status_code}",
+                    request=response.request,
+                    response=response,
+                )
+            response.raise_for_status()
+            break
+        except (httpx.HTTPStatusError, httpx.TransportError) as exc:
+            last_error = exc
+            if attempt < 2:
+                time.sleep(1.5 * (attempt + 1))
+    else:
+        raise last_error if last_error else RuntimeError("Gemini request failed")
     data = response.json()
     candidates = data.get("candidates") or []
     if not candidates:
@@ -203,7 +223,7 @@ def chat(
     # 4. Get an AI response calibrated to the stored level.
     assessed_level = (user.level or '').strip().lower()
     tutor_level = assessed_level if assessed_level not in {'', 'pending', 'intermediate'} or (user.level_score or 0) > 0 else 'not assessed yet'
-    reply = 'تم استلام رسالتك، لكن مزود الذكاء الاصطناعي غير مفعّل حاليًا. أضف مفتاحًا صالحًا في Backend ثم أعد المحاولة.'
+    reply = 'تم استلام رسالتك، لكن مزود الذكاء الاصطناعي غير مفعّل حاليًا. أضف مفتاحًا صالحًا ثم أعد المحاولة.'
     ai_tips: List[str] = []
     structured_corrections: List[Dict[str, str]] = []
     analysis_completed = False
@@ -234,23 +254,35 @@ def chat(
         settings.GEMINI_API_KEY if provider == 'gemini' else settings.OPENAI_API_KEY
     )
 
+    def _call_openai() -> str:
+        client = OpenAI(
+            api_key=settings.OPENAI_API_KEY,
+            base_url=settings.OPENAI_BASE_URL,
+        )
+        response = client.chat.completions.create(
+            model=settings.OPENAI_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=500,
+            response_format={"type": "json_object"},
+        )
+        return response.choices[0].message.content or ""
+
     if provider_key_available:
         try:
             if provider == 'gemini':
-                raw_output = _generate_gemini(prompt)
+                try:
+                    raw_output = _generate_gemini(prompt)
+                except Exception as gemini_exc:
+                    # Automatic fallback: if Gemini is down/overloaded but an
+                    # OpenAI-compatible key exists, use it instead of failing.
+                    if settings.OPENAI_API_KEY:
+                        logger.warning("Gemini failed (%s); falling back to OpenAI", gemini_exc)
+                        raw_output = _call_openai()
+                    else:
+                        raise
             else:
-                client = OpenAI(
-                    api_key=settings.OPENAI_API_KEY,
-                    base_url=settings.OPENAI_BASE_URL,
-                )
-                response = client.chat.completions.create(
-                    model=settings.OPENAI_MODEL,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.7,
-                    max_tokens=500,
-                    response_format={"type": "json_object"},
-                )
-                raw_output = response.choices[0].message.content or ""
+                raw_output = _call_openai()
 
             try:
                 parsed = _parse_json_object(raw_output)
@@ -288,15 +320,15 @@ def chat(
             if '429' in message or 'quota' in message or 'insufficient_quota' in message:
                 analysis_message = 'لم يكتمل تحليل هذه الرسالة لأن حد استخدام مزود AI انتهى. تحقق من الخطة أو استخدم مزودًا آخر.'
             elif 'api key not valid' in message or 'invalid api key' in message or 'permission denied' in message or '401' in message or '403' in message:
-                analysis_message = 'مفتاح Gemini غير صالح أو غير مفعّل. راجع GEMINI_API_KEY في Backend/.env ثم أعد تشغيل الخادم.'
+                analysis_message = 'مفتاح Gemini غير صالح أو غير مفعّل. راجع إعدادات GEMINI_API_KEY ثم أعد تشغيل الخادم.'
             elif '404' in message or 'not found' in message:
-                analysis_message = 'نموذج Gemini المحدد غير متاح لهذا المفتاح. راجع GEMINI_MODEL في Backend/.env.'
+                analysis_message = 'نموذج Gemini المحدد غير متاح لهذا المفتاح. راجع إعدادات GEMINI_MODEL.'
             elif 'timeout' in message or 'timed out' in message:
                 analysis_message = 'انتهت مهلة الاتصال بمزود AI. تحقق من الإنترنت ثم حاول مرة أخرى.'
             else:
-                analysis_message = 'لم يكتمل تحليل هذه الرسالة بسبب تعذر الوصول إلى مزود AI. تحقق من إعدادات Backend ثم أعد المحاولة.'
+                analysis_message = 'لم يكتمل تحليل هذه الرسالة بسبب تعذر الوصول إلى مزود الذكاء الاصطناعي. تحقق من الإعدادات ثم أعد المحاولة.'
     else:
-        analysis_message = f'لم يكتمل تحليل هذه الرسالة لأن مزود {provider.upper()} غير مهيأ. تحقق من مفتاحه في Backend/.env ثم أعد تشغيل الخادم.'
+        analysis_message = f'لم يكتمل تحليل هذه الرسالة لأن مزود {provider.upper()} غير مهيأ. تحقق من مفتاحه ثم أعد تشغيل الخادم.'
 
     # 5. Prepare corrections
     corrections = structured_corrections or [
