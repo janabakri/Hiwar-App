@@ -9,6 +9,7 @@ from ...core.database import get_db
 from ...core.security import enforce_owner, get_current_user
 from ...models.journal import JournalEntry
 from ...models.user import User
+from ...services.error_tracker import detect_errors
 from .chat import _generate_gemini, _parse_json_object
 
 router = APIRouter()
@@ -46,8 +47,22 @@ Journal entry: {request.text.strip()}
 """
     try:
         parsed = _parse_json_object(_generate_gemini(prompt))
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail="تعذر تحليل اليومية. تأكد من إعداد مزود الذكاء الاصطناعي ثم أعد المحاولة.") from exc
+    except Exception:
+        local_errors = detect_errors(request.text.strip())
+        corrected_text = request.text.strip()
+        local_corrections = []
+        for item in local_errors:
+            corrected_text = corrected_text.replace(item["wrong_text"], item["correct_text"])
+            local_corrections.append({
+                "wrong": item["wrong_text"],
+                "correct": item["correct_text"],
+                "explanation": item["explanation"],
+            })
+        parsed = {
+            "reply": "What was the best part of your day?",
+            "corrections": local_corrections,
+            "tips": [corrected_text],
+        }
 
     corrections = parsed.get("corrections") if isinstance(parsed.get("corrections"), list) else []
     tips = parsed.get("tips") if isinstance(parsed.get("tips"), list) else []
