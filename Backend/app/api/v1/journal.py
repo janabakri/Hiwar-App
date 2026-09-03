@@ -47,7 +47,7 @@ Journal entry: {request.text.strip()}
     try:
         parsed = _parse_json_object(_generate_gemini(prompt))
     except Exception as exc:
-        raise HTTPException(status_code=503, detail="تعذر تحليل اليومية. تأكد من إعداد مزود الذكاء الاصطناعي في Backend.") from exc
+        raise HTTPException(status_code=503, detail="تعذر تحليل اليومية. تأكد من إعداد مزود الذكاء الاصطناعي ثم أعد المحاولة.") from exc
 
     corrections = parsed.get("corrections") if isinstance(parsed.get("corrections"), list) else []
     tips = parsed.get("tips") if isinstance(parsed.get("tips"), list) else []
