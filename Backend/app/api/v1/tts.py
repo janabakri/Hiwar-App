@@ -43,8 +43,11 @@ def _pcm_to_wav(pcm: bytes, sample_rate: int = 24000, channels: int = 1, bits: i
 def _gemini_tts(text: str, voice: str) -> bytes:
     voice_name = _GEMINI_VOICE_BY_PREFERENCE.get(voice, "Aoede")
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{TTS_MODEL}:generateContent"
+    # The TTS model rejects raw text with 400 ("Model tried to generate text");
+    # it requires a spoken-style instruction prefix before the transcript.
+    style = "in a warm, friendly, natural female voice" if voice == "female" else "in a warm, friendly, natural male voice"
     payload = {
-        "contents": [{"parts": [{"text": text}]}],
+        "contents": [{"parts": [{"text": f"Say {style}: {text}"}]}],
         "generationConfig": {
             "responseModalities": ["AUDIO"],
             "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice_name}}},

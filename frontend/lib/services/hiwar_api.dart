@@ -128,13 +128,19 @@ class HiwarJournalResult {
   final String correctedText;
   final String followUpQuestion;
   final List<Map<String, String>> corrections;
+  final bool fromLocalFallback;
+  final bool analysisCompleted;
+  final String statusMessage;
 
   const HiwarJournalResult(
       {required this.id,
       required this.originalText,
       required this.correctedText,
       required this.followUpQuestion,
-      required this.corrections});
+      required this.corrections,
+      this.fromLocalFallback = false,
+      this.analysisCompleted = true,
+      this.statusMessage = ''});
 
   factory HiwarJournalResult.fromJson(Map<String, dynamic> json) =>
       HiwarJournalResult(
@@ -142,6 +148,9 @@ class HiwarJournalResult {
         originalText: '${json['original_text'] ?? ''}',
         correctedText: '${json['corrected_text'] ?? ''}',
         followUpQuestion: '${json['follow_up_question'] ?? ''}',
+        fromLocalFallback: json['source'] == 'local',
+        analysisCompleted: json['analysis_completed'] != false,
+        statusMessage: '${json['status_message'] ?? ''}',
         corrections: ((json['corrections'] as List?) ?? const [])
             .whereType<Map>()
             .map((item) => <String, String>{

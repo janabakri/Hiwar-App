@@ -681,6 +681,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
   bool submittedCurrent = false;
   bool openingPlayed = false;
   bool ttsConfigured = false;
+  bool showTutorText = true;
   String voicePreference = 'female';
   double speechRate = 0.92;
   String? tutorInstruction;
@@ -1157,11 +1158,23 @@ class _VoiceScreenState extends State<VoiceScreen> {
                               const SizedBox(width: 7),
                               Text('رد المدرب',
                                   style: ar(12.5, weight: FontWeight.w800)),
+                              const Spacer(),
+                              GestureDetector(
+                                  onTap: () => setState(
+                                      () => showTutorText = !showTutorText),
+                                  child: Text(
+                                      showTutorText
+                                          ? 'إخفاء الكلام'
+                                          : 'إظهار الكلام',
+                                      style: ar(11,
+                                          color: primary,
+                                          weight: FontWeight.w700))),
                             ]),
                             const SizedBox(height: 7),
-                            Text(reply,
-                                style: en(13, color: inkSoft)
-                                    .copyWith(height: 1.55)),
+                            if (showTutorText)
+                              Text(reply,
+                                  style: en(13, color: inkSoft)
+                                      .copyWith(height: 1.55)),
                             Align(
                               alignment: Alignment.centerLeft,
                               child: TextButton.icon(
@@ -3903,6 +3916,13 @@ class _JournalScreenState extends State<JournalScreen> {
                     child: Text(error!, style: ar(12, color: rust))),
               if (result != null) ...[
                 const _SectionTitle('مرآة كلامك'),
+                if (result!.statusMessage.trim().isNotEmpty)
+                  Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Text(result!.statusMessage,
+                          style: ar(12,
+                              color:
+                                  result!.analysisCompleted ? inkSoft : rust))),
                 _Card(
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -4095,6 +4115,8 @@ class VoiceTimelineScreen extends StatefulWidget {
 class _VoiceTimelineScreenState extends State<VoiceTimelineScreen> {
   List<Map<String, String>> entries = const [];
   bool loading = true;
+  String? loadError;
+  bool playingComparison = false;
   final FlutterTts tts = FlutterTts();
 
   @override
@@ -4104,18 +4126,43 @@ class _VoiceTimelineScreenState extends State<VoiceTimelineScreen> {
   }
 
   Future<void> _load() async {
-    final data = await widget.api.getVoiceTimeline();
-    if (mounted)
-      setState(() {
-        entries = data;
-        loading = false;
-      });
+    try {
+      final data = await widget.api.getVoiceTimeline();
+      if (mounted)
+        setState(() {
+          entries = data;
+          loadError = null;
+          loading = false;
+        });
+    } catch (_) {
+      if (mounted)
+        setState(() {
+          entries = const [];
+          loadError = HiwarApi.describeError(_);
+          loading = false;
+        });
+    }
   }
 
   Future<void> _play(String text) async {
     await tts.setLanguage('en-US');
     await tts.setSpeechRate(.78);
     await tts.speak(text);
+  }
+
+  Future<void> _playComparison(String first, String latest) async {
+    if (playingComparison) return;
+    setState(() => playingComparison = true);
+    await _play(first);
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    await _play(latest);
+    if (mounted) setState(() => playingComparison = false);
+  }
+
+  String _dateLabel(String value) {
+    final date = DateTime.tryParse(value);
+    if (date == null) return 'جلسة سابقة';
+    return '${date.day}/${date.month}/${date.year}';
   }
 
   @override
@@ -4129,80 +4176,265 @@ class _VoiceTimelineScreenState extends State<VoiceTimelineScreen> {
     final first = entries.isNotEmpty ? entries.last : null;
     final latest = entries.isNotEmpty ? entries.first : null;
     return Scaffold(
-        backgroundColor: bg,
-        appBar: AppBar(
-            backgroundColor: bg,
-            elevation: 0,
-            title: Text('اسمع تطورك', style: ar(16, weight: FontWeight.w700))),
-        body: loading
-            ? const Center(child: CircularProgressIndicator(color: primary))
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
-                children: [
-                    if (entries.length < 2)
-                      _Card(
-                          child: Column(children: [
-                        const Icon(Icons.graphic_eq_rounded,
-                            color: primary, size: 30),
+      backgroundColor: bg,
+      appBar: AppBar(
+          backgroundColor: bg,
+          elevation: 0,
+          title: Text('اسمع تطورك', style: ar(16, weight: FontWeight.w700))),
+      body: loading
+          ? const Center(child: CircularProgressIndicator(color: primary))
+          : loadError != null
+              ? Center(
+                  child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: _Card(
+                          child:
+                              Column(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.cloud_off_rounded,
+                            color: rust, size: 34),
                         const SizedBox(height: 10),
-                        Text(
-                            'سجّل محادثتين على الأقل حتى تسمع الفرق بين بدايتك وآخر تقدم لك.',
+                        Text('تعذر تحميل سجل تطورك',
+                            style: ar(15, weight: FontWeight.w800)),
+                        const SizedBox(height: 6),
+                        Text(loadError!,
                             textAlign: TextAlign.center,
-                            style: ar(13, color: inkSoft).copyWith(height: 1.7))
-                      ]))
-                    else ...[
-                      _TimelineCompareCard(
-                          title: 'أول خطوة',
-                          entry: first!,
-                          onPlay: () => _play(first['text']!)),
-                      const SizedBox(height: 10),
-                      _TimelineCompareCard(
-                          title: 'آخر محادثة',
-                          entry: latest!,
-                          onPlay: () => _play(latest['text']!)),
-                      const SizedBox(height: 12),
-                      _Card(
-                          child: Text(
-                              'النسخة الأولى تحفظ نص المحادثة وتتيح سماعه للمقارنة. تسجيل الملفات الصوتية الفعلية يحتاج تخزينًا وموافقة صريحة من المستخدم.',
-                              style: ar(11.5, color: inkFaint)
-                                  .copyWith(height: 1.7))),
-                    ],
-                  ]));
+                            style: ar(12, color: inkSoft)),
+                        const SizedBox(height: 14),
+                        OutlinedButton.icon(
+                            onPressed: _load,
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: Text('حاولي مرة أخرى',
+                                style: ar(12, weight: FontWeight.w700)))
+                      ]))))
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
+                  children: [
+                      Text('رحلتك مع حوار',
+                          style: ar(22, weight: FontWeight.w800)),
+                      const SizedBox(height: 5),
+                      Text('من أول كلمة إلى آخر تقدم',
+                          style: ar(12.5, color: inkFaint)),
+                      const SizedBox(height: 16),
+                      Row(children: [
+                        Expanded(
+                            child: _ProgressStat(
+                                value: '${entries.length}', label: 'جلسات')),
+                        const SizedBox(width: 10),
+                        Expanded(
+                            child: _ProgressStat(
+                                value: entries.length >= 2 ? '2' : '1',
+                                label: 'نقاط مقارنة')),
+                        const SizedBox(width: 10),
+                        Expanded(
+                            child: _ProgressStat(
+                                value: entries.isEmpty ? '—' : '✓',
+                                label: 'تقدم محفوظ')),
+                      ]),
+                      const SizedBox(height: 18),
+                      if (entries.length < 2)
+                        _Card(
+                            child: Column(children: [
+                          const Icon(Icons.graphic_eq_rounded,
+                              color: primary, size: 32),
+                          const SizedBox(height: 10),
+                          Text('قصتك تبدأ هنا',
+                              style: ar(16, weight: FontWeight.w800)),
+                          const SizedBox(height: 6),
+                          Text(
+                              entries.isEmpty
+                                  ? 'سجّل أول محادثة، وبعد جلسة أخرى ستظهر المقارنة بين بدايتك وآخر تقدم لك.'
+                                  : 'تم حفظ أول خطوة. سجّل محادثة أخرى حتى نعرض الفرق بين التسجيلين.',
+                              textAlign: TextAlign.center,
+                              style:
+                                  ar(13, color: inkSoft).copyWith(height: 1.7))
+                        ]))
+                      else ...[
+                        _TimelineCompareCard(
+                            title: 'هنا بدأت',
+                            badge: 'أول محاولة',
+                            date: _dateLabel(first!['date'] ?? ''),
+                            entry: first,
+                            accent: rust,
+                            onPlay: () => _play(first['text'] ?? '')),
+                        Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: OutlinedButton.icon(
+                                onPressed: playingComparison
+                                    ? null
+                                    : () => _playComparison(first['text'] ?? '',
+                                        latest!['text'] ?? ''),
+                                icon: Icon(
+                                    playingComparison
+                                        ? Icons.graphic_eq_rounded
+                                        : Icons.play_arrow_rounded,
+                                    size: 19),
+                                label: Text(
+                                    playingComparison
+                                        ? 'جاري تشغيل المقارنة...'
+                                        : 'شغّل المقارنة',
+                                    style: ar(12.5, weight: FontWeight.w700)),
+                                style: OutlinedButton.styleFrom(
+                                    foregroundColor: primary,
+                                    side: const BorderSide(color: primary),
+                                    padding: const EdgeInsets.all(13),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(14))))),
+                        _TimelineCompareCard(
+                            title: 'هنا وصلت',
+                            badge: 'آخر تقدم',
+                            date: _dateLabel(latest!['date'] ?? ''),
+                            entry: latest,
+                            accent: primary,
+                            onPlay: () => _play(latest['text'] ?? '')),
+                        const SizedBox(height: 14),
+                        _Card(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                              Text('ما الذي تغيّر؟',
+                                  style: ar(14, weight: FontWeight.w800)),
+                              const SizedBox(height: 9),
+                              _ProgressPoint(
+                                  icon: Icons.graphic_eq_rounded,
+                                  text:
+                                      'أصبح لديك سجل حقيقي يمكنك الرجوع إليه.'),
+                              _ProgressPoint(
+                                  icon: Icons.headphones_outlined,
+                                  text:
+                                      'استمع إلى المحاولتين ولاحظ الفرق بنفسك.'),
+                              _ProgressPoint(
+                                  icon: Icons.lock_outline_rounded,
+                                  text: 'تبقى المقاطع محفوظة لك داخل التطبيق.')
+                            ])),
+                      ],
+                    ]),
+    );
   }
+}
+
+class _ProgressStat extends StatelessWidget {
+  final String value;
+  final String label;
+  const _ProgressStat({required this.value, required this.label});
+  @override
+  Widget build(BuildContext context) => Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+          color: paper,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: line)),
+      child: Column(children: [
+        Text(value, style: mono(16, color: primary)),
+        const SizedBox(height: 3),
+        Text(label, style: ar(10.5, color: inkFaint))
+      ]));
+}
+
+class _ProgressPoint extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _ProgressPoint({required this.icon, required this.text});
+  @override
+  Widget build(BuildContext context) => Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: Row(children: [
+        Icon(icon, color: primary, size: 18),
+        const SizedBox(width: 8),
+        Expanded(child: Text(text, style: ar(12, color: inkSoft)))
+      ]));
 }
 
 class _TimelineCompareCard extends StatelessWidget {
   final String title;
+  final String badge;
+  final String date;
   final Map<String, String> entry;
+  final Color accent;
   final VoidCallback onPlay;
   const _TimelineCompareCard(
-      {required this.title, required this.entry, required this.onPlay});
+      {required this.title,
+      required this.badge,
+      required this.date,
+      required this.entry,
+      required this.accent,
+      required this.onPlay});
   @override
   Widget build(BuildContext context) => _Card(
-          child: Row(children: [
-        Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-                color: primaryTint, borderRadius: BorderRadius.circular(14)),
-            child: const Icon(Icons.graphic_eq_rounded, color: primary)),
-        const SizedBox(width: 12),
-        Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: ar(14, weight: FontWeight.w800)),
-          const SizedBox(height: 4),
-          Text('كلامك في المحادثة', style: ar(11, color: inkFaint)),
-          Text(entry['text']!,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: en(12, color: inkSoft))
-        ])),
-        IconButton(
-            onPressed: onPlay,
-            icon: const Icon(Icons.play_circle_outline_rounded,
-                color: primary, size: 30))
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                  color: accent.withOpacity(.12),
+                  borderRadius: BorderRadius.circular(13)),
+              child: Icon(Icons.graphic_eq_rounded, color: accent)),
+          const SizedBox(width: 11),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(title, style: ar(14, weight: FontWeight.w800)),
+                Text('$badge · $date', style: ar(11, color: inkFaint))
+              ])),
+          IconButton(
+              onPressed: onPlay,
+              icon: Icon(Icons.play_circle_outline_rounded,
+                  color: accent, size: 31))
+        ]),
+        const SizedBox(height: 12),
+        _MiniWave(accent: accent),
+        const SizedBox(height: 9),
+        Text(entry['text'] ?? '',
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: en(12.5, color: inkSoft).copyWith(height: 1.5))
       ]));
+}
+
+class _MiniWave extends StatelessWidget {
+  final Color accent;
+  const _MiniWave({required this.accent});
+  @override
+  Widget build(BuildContext context) {
+    const heights = [
+      12.0,
+      22.0,
+      16.0,
+      30.0,
+      20.0,
+      34.0,
+      15.0,
+      25.0,
+      18.0,
+      28.0,
+      13.0,
+      23.0,
+      17.0,
+      31.0,
+      20.0,
+      14.0,
+      26.0,
+      18.0,
+      29.0,
+      16.0
+    ];
+    return SizedBox(
+        height: 34,
+        child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          for (final height in heights)
+            Expanded(
+                child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Container(
+                        height: height,
+                        decoration: BoxDecoration(
+                            color: accent.withOpacity(.72),
+                            borderRadius: BorderRadius.circular(5)))))
+        ]));
+  }
 }
 
 class AchievementScreen extends StatelessWidget {

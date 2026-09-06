@@ -79,7 +79,7 @@ def _generate_gemini(prompt: str) -> str:
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.4,
-            "maxOutputTokens": 500,
+            "maxOutputTokens": 800,
             "responseMimeType": "application/json",
             "responseSchema": {
                 "type": "OBJECT",

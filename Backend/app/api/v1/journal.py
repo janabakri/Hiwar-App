@@ -1,5 +1,8 @@
 """Daily English journal endpoints linked to speaking practice."""
+import logging
 from typing import List
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -26,6 +29,9 @@ class JournalAnalyzeResponse(BaseModel):
     corrected_text: str
     follow_up_question: str
     corrections: List[dict]
+    source: str = "ai"  # "ai" = Gemini, "local" = offline rule-based fallback
+    analysis_completed: bool = True
+    status_message: str = "تم حفظ اليومية وتحليلها بنجاح."
 
 
 @router.post("/journal/analyze", response_model=JournalAnalyzeResponse)
@@ -45,9 +51,14 @@ Return JSON with exactly these keys:
 Keep the language encouraging and do not claim a level.
 Journal entry: {request.text.strip()}
 """
+    used_local_fallback = False
     try:
         parsed = _parse_json_object(_generate_gemini(prompt))
-    except Exception:
+    except Exception as exc:
+        # Surface the real reason (bad JSON, timeout, provider error) in server logs
+        # instead of silently pretending the AI analyzed the entry.
+        logger.warning("Journal AI analysis failed (%s); using local fallback", exc)
+        used_local_fallback = True
         local_errors = detect_errors(request.text.strip())
         corrected_text = request.text.strip()
         local_corrections = []
@@ -83,6 +94,13 @@ Journal entry: {request.text.strip()}
         corrected_text=entry.corrected_text,
         follow_up_question=entry.follow_up_question,
         corrections=[item for item in corrections if isinstance(item, dict)],
+        source="local" if used_local_fallback else "ai",
+        analysis_completed=not used_local_fallback,
+        status_message=(
+            "تم حفظ اليومية، لكن تعذر التحليل الذكي مؤقتًا فاستُخدم التصحيح المحلي."
+            if used_local_fallback
+            else "تم حفظ اليومية وتحليلها بنجاح."
+        ),
     )
 
 
