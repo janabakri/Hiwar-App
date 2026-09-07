@@ -89,6 +89,11 @@ class Settings:
     SMTP_FROM: str = os.getenv("SMTP_FROM", "")
     SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "حوار App")
 
+    # Rate limiting (in-memory, per worker process)
+    RATE_LIMIT_PERIOD: int = int(os.getenv("RATE_LIMIT_PERIOD", "60"))
+    RATE_LIMIT_REQUESTS: int = int(os.getenv("RATE_LIMIT_REQUESTS", "60"))
+    RATE_LIMIT_AUTH_REQUESTS: int = int(os.getenv("RATE_LIMIT_AUTH_REQUESTS", "10"))
+
     # Learning reminders (server-side baseline; the client schedules local notifications)
     REMINDER_DEFAULT_HOUR: int = int(os.getenv("REMINDER_DEFAULT_HOUR", "20"))
 
@@ -98,6 +103,8 @@ class Settings:
                 raise RuntimeError("SECRET_KEY must contain at least 32 characters in production")
             if "*" in self.CORS_ORIGINS:
                 raise RuntimeError("Wildcard CORS is forbidden in production")
+            if self.ALLOW_MANUAL_AUTH:
+                raise RuntimeError("ALLOW_MANUAL_AUTH must be False in production")
 
 
 settings = Settings()

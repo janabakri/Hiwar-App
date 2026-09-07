@@ -14,6 +14,22 @@ __pycache__/
 *.db
 *.sqlite
 
+# Logs
+*.log
+*.log.*
+logs/
+
+# Test output / temp
+pytest_out.txt
+*.zip
+
+# Misc binaries / local config
+*.exe
+**/local.properties
+
+# macOS/OS artifacts
+.DS_Store
+
 # IDE
 .vscode/
 .idea/

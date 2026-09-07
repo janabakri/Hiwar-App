@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .core.config import settings
+from .core.rate_limit import RateLimitMiddleware
 from .core.database import engine, Base
 from .core.migrations import ensure_user_profile_columns
 from .api.v1 import chat, profile, assessment, journal, conversations, tts
@@ -43,14 +44,17 @@ app = FastAPI(
     debug=settings.DEBUG
 )
 
-# CORS
+# CORS — restricted to configured origins (settings.CORS_ORIGINS)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Rate limiting — applied after CORS so preflight requests aren't counted
+app.add_middleware(RateLimitMiddleware)
 
 # Include routers
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
