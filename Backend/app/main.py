@@ -44,6 +44,11 @@ app = FastAPI(
     debug=settings.DEBUG
 )
 
+# Rate limiting — added BEFORE CORS so it runs AFTER it on incoming
+# requests: preflight (OPTIONS) is answered/handled by CORS first and
+# 429 responses still include CORS headers (visible to browsers).
+app.add_middleware(RateLimitMiddleware)
+
 # CORS — restricted to configured origins (settings.CORS_ORIGINS)
 app.add_middleware(
     CORSMiddleware,
@@ -52,9 +57,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Rate limiting — applied after CORS so preflight requests aren't counted
-app.add_middleware(RateLimitMiddleware)
 
 # Include routers
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])

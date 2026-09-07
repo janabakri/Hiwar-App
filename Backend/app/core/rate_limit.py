@@ -59,11 +59,15 @@ limiter = RateLimiter()
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
+        # Never rate-limit CORS preflight — browsers send OPTIONS automatically
+        # and counting them would double-count every real request.
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         path = request.url.path
         for bucket, prefix, limit, period in _RULES:
             if path.startswith(prefix):
-                client = request.client.host if request.client else "unknown"
-                if not limiter.check(bucket, client, limit, period):
+                if not limiter.check(bucket, self._client_ip(request), limit, period):
                     return JSONResponse(
                         status_code=429,
                         content={"detail": "عدد الطلبات كبير جدًا، حاول بعد قليل."},
@@ -71,3 +75,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     )
                 break
         return await call_next(request)
+
+    @staticmethod
+    def _client_ip(request) -> str:
+        # Behind a reverse proxy (nginx/Docker/cloudflared), request.client.host
+        # is the proxy itself — all users would share one bucket. Trust the
+        # standard X-Forwarded-For header first (first hop = original client).
+        forwarded = request.headers.get("x-forwarded-for", "")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+        return request.client.host if request.client else "unknown"
