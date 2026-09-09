@@ -2922,16 +2922,81 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
   bool videoFailed = false;
   late List<String> listeningOptions;
 
+  // Per-skill scoring (used to build the breakdown on the result screen).
+  int grammarScore = 0; // out of grammar.length
+  int vocabScore = 0; // out of vocabulary.length
+  bool? readingCorrect;
+  bool? listeningCorrect;
+
   bool get aiChoosesSkill => (widget.focusSkills ?? '').contains('ما أعرف');
 
+  // Rotating reading passages so the answer can't be spotted by matching
+  // words with the passage alone, and so repeat test-takers see variety.
+  // Each 'correct' index refers to the position in 'options'.
+  static final List<Map<String, Object>> _readingSets = [
+    {
+      'passage':
+          'Many people think learning a language quickly requires talent, '
+              'but research shows that consistency matters more than natural '
+              'ability. Learners who practice for fifteen minutes every day '
+              'usually improve faster than those who study for hours only '
+              'once a week.',
+      'question': 'According to the passage, what matters more than talent?',
+      'options': ['Consistency', 'Natural ability', 'Studying once a week'],
+      'correct': 0,
+    },
+    {
+      'passage':
+          'Maria was nervous before her job interview, so she practiced her '
+              'answers out loud the night before. The next day, she felt calm '
+              'because she already knew what she wanted to say.',
+      'question': 'Why did Maria feel calm during the interview?',
+      'options': [
+        'She had practiced the night before',
+        'She arrived very early',
+        'The interviewer was a friend'
+      ],
+      'correct': 0,
+    },
+    {
+      'passage':
+          'Coffee is one of the most traded products in the world. Although '
+              'it grows only in warm climates near the equator, people drink it '
+              'everywhere, from cold northern cities to hot deserts.',
+      'question': 'What does the passage say about where coffee grows?',
+      'options': [
+        'Only in warm climates near the equator',
+        'Only in cold northern cities',
+        'Only in hot deserts'
+      ],
+      'correct': 0,
+    },
+  ];
+  late final Map<String, Object> readingSet =
+      _readingSets[Random().nextInt(_readingSets.length)];
+
+  // Rotating speaking warm-up prompts (all low-pressure, no prep needed)
+  // so answers stay spontaneous instead of memorized/shared between users.
+  static const List<String> _speakingPrompts = [
+    'Tell me about yourself.',
+    'Describe your typical day.',
+    'What do you like to do in your free time?',
+    'Tell me about a place you would like to visit.',
+  ];
+  late final String speakingPrompt =
+      _speakingPrompts[Random().nextInt(_speakingPrompts.length)];
+
   Future<void> submitReading(String answer) async {
-    final isCorrect = answer.startsWith('Small');
+    final options = readingSet['options'] as List;
+    final correctIndex = readingSet['correct'] as int;
+    final isCorrect = answer == options[correctIndex];
 
     // Move the learner forward immediately. The AI assessment is supplementary
     // and must not block the next section of the level test.
     if (mounted) {
       setState(() {
         answeredQuestions++;
+        readingCorrect = isCorrect;
         if (isCorrect) score++;
         section++;
         question = 0;
@@ -2947,8 +3012,7 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
     try {
       await widget.api!.assessReading(
         userId: widget.userId!,
-        passage:
-            'Learning a language takes practice. Small daily conversations can help you become more confident and understand people from different cultures.',
+        passage: '${readingSet['passage']}',
         answer: answer,
       );
     } catch (_) {
@@ -3050,7 +3114,15 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
 
   void answer(int index) {
     answeredQuestions++;
-    if (index == currentQuestions[question]['correct']) score++;
+    final isCorrect = index == currentQuestions[question]['correct'];
+    if (isCorrect) {
+      score++;
+      if (section == 0) {
+        grammarScore++;
+      } else {
+        vocabScore++;
+      }
+    }
     if (question < currentQuestions.length - 1) {
       setState(() => question++);
       return;
@@ -3128,6 +3200,50 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
     return 'C1 — متقدم';
   }
 
+  // Short CEFR code (no Arabic label) — used for the small per-skill badges.
+  String cefrCode(int percent) {
+    if (percent < 25) return 'A1';
+    if (percent < 45) return 'A2';
+    if (percent < 65) return 'B1';
+    if (percent < 82) return 'B2';
+    return 'C1';
+  }
+
+  // Approximate, commonly published CEFR↔IELTS/TOEFL concordance ranges
+  // (the same kind of table used across ESL placement tools). Presented as
+  // an estimate, not an official test score.
+  static const Map<String, Map<String, String>> _ieltsToeflTable = {
+    'A1': {'ielts': '2.5–3.5', 'toefl': '0–31'},
+    'A2': {'ielts': '3.0–4.0', 'toefl': '32–34'},
+    'B1': {'ielts': '4.0–5.0', 'toefl': '35–59'},
+    'B2': {'ielts': '4.5–6.5', 'toefl': '60–78'},
+    'C1': {'ielts': '7.0–8.0', 'toefl': '95–113'},
+    'C2': {'ielts': '8.5–9.0', 'toefl': '114–120'},
+  };
+  Map<String, String> ieltsToeflFor(String code) =>
+      _ieltsToeflTable[code] ?? _ieltsToeflTable['B1']!;
+
+  // Per-skill breakdown for the result screen (each 0–100).
+  int get grammarPercent =>
+      ((grammarScore / grammar.length) * 100).round().clamp(0, 100);
+  int get vocabPercent =>
+      ((vocabScore / vocabulary.length) * 100).round().clamp(0, 100);
+  int get comprehensionPercent {
+    final answered =
+        (readingCorrect == null ? 0 : 1) + (listeningCorrect == null ? 0 : 1);
+    if (answered == 0) return 0;
+    final correct =
+        (readingCorrect == true ? 1 : 0) + (listeningCorrect == true ? 1 : 0);
+    return ((correct / answered) * 100).round().clamp(0, 100);
+  }
+
+  int get speakingPercent {
+    final raw = speakingAnalysis['overall_score'];
+    if (raw is num) return raw.toInt().clamp(0, 100);
+    final parsed = int.tryParse('$raw');
+    return parsed == null ? 0 : parsed.clamp(0, 100);
+  }
+
   Future<void> finish() async {
     if (widget.api == null || widget.userId == null) {
       if (mounted) {
@@ -3144,7 +3260,7 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
     try {
       speakingAnalysis = await widget.api!.assessSpeaking(
           userId: widget.userId!,
-          prompt: 'Tell me about yourself.',
+          prompt: speakingPrompt,
           transcript: spokenText);
     } catch (_) {
       speakingAnalysis = {
@@ -3306,6 +3422,46 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                Text('نتيجتك حسب كل مهارة',
+                    style: ar(14, weight: FontWeight.w800)),
+                const SizedBox(height: 4),
+                Text('تقدير تقريبي مبني على إجاباتك في هذا الاختبار.',
+                    style: ar(11, color: inkFaint)),
+                const SizedBox(height: 14),
+                _skillRow('القواعد (Grammar)', grammarPercent),
+                const Divider(height: 26),
+                _skillRow('المفردات (Vocabulary)', vocabPercent),
+                const Divider(height: 26),
+                _skillRow('الفهم (Reading & Listening)', comprehensionPercent),
+                const Divider(height: 26),
+                _skillRow('التحدث (Speaking)', speakingPercent),
+              ])),
+          const SizedBox(height: 14),
+          _Card(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text('مستواك في الاختبارات الدولية',
+                    style: ar(14, weight: FontWeight.w800)),
+                const SizedBox(height: 4),
+                Text('تقدير تقريبي بناءً على نتيجتك — وليس نتيجة اختبار رسمي.',
+                    style: ar(11, color: inkFaint)),
+                const SizedBox(height: 14),
+                Row(children: [
+                  Expanded(
+                      child: _testEquivalentTile(
+                          'IELTS', ieltsToeflFor(cefrCode(percent))['ielts']!)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                      child: _testEquivalentTile(
+                          'TOEFL', ieltsToeflFor(cefrCode(percent))['toefl']!)),
+                ]),
+              ])),
+          const SizedBox(height: 16),
+          _Card(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                 Text('ملخص الاختبار', style: ar(14, weight: FontWeight.w800)),
                 const SizedBox(height: 10),
                 Text('${speakingAnalysis['feedback'] ?? 'تحليل AI جاهز.'}',
@@ -3335,6 +3491,79 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
                           weight: FontWeight.w800, color: Colors.white)))),
         ]);
   }
+
+  Color _cefrBadgeColor(String code) {
+    switch (code) {
+      case 'A1':
+        return Colors.blueGrey;
+      case 'A2':
+        return Colors.teal;
+      case 'B1':
+        return Colors.orange;
+      case 'B2':
+        return Colors.green;
+      case 'C1':
+        return Colors.purple;
+      default:
+        return primary;
+    }
+  }
+
+  Widget _skillRow(String label, int percent) {
+    final code = cefrCode(percent);
+    final color = _cefrBadgeColor(code);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: ar(12.5, weight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: percent / 100,
+                  minHeight: 6,
+                  backgroundColor: primaryTint,
+                  color: primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text('$percent%', style: mono(13, color: primary)),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: color.withOpacity(.15),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(code,
+              style: ar(11, weight: FontWeight.w800, color: color)),
+        ),
+      ],
+    );
+  }
+
+  Widget _testEquivalentTile(String name, String range) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+      decoration: BoxDecoration(
+        color: primaryTint,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(children: [
+        Text(name, style: ar(12, weight: FontWeight.w700, color: primary)),
+        const SizedBox(height: 6),
+        Text(range, style: mono(16, color: primary)),
+      ]),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -3432,25 +3661,22 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
                     style: ar(14, weight: FontWeight.w700)),
                 const SizedBox(height: 12),
                 _Card(
-                    child: Text(
-                        'Learning a language takes practice. Small daily conversations can help you become more confident and understand people from different cultures.',
+                    child: Text('${readingSet['passage']}',
                         style: en(15, color: inkSoft).copyWith(height: 1.7))),
                 const SizedBox(height: 14),
                 _Card(
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                      Text('What helps you become more confident?',
+                      Text('${readingSet['question']}',
                           style: en(15, weight: FontWeight.w700)),
                       const SizedBox(height: 12),
-                      ...[
-                        'Small daily conversations',
-                        'Watching no videos',
-                        'Avoiding practice'
-                      ].map((item) => ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(item, style: en(13)),
-                          onTap: () => submitReading(item)))
+                      ...(readingSet['options'] as List)
+                          .cast<String>()
+                          .map((item) => ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(item, style: en(13)),
+                              onTap: () => submitReading(item)))
                     ])),
               ] else if (isListening) ...[
                 Text('استمع إلى المقطع ثم اختر المعنى الأقرب.',
@@ -3523,7 +3749,9 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
                       title: Text(item, style: en(13)),
                       onTap: () {
                         answeredQuestions++;
-                        score += item == listeningOptions.first ? 1 : 0;
+                        final isCorrect = item == listeningOptions.first;
+                        listeningCorrect = isCorrect;
+                        score += isCorrect ? 1 : 0;
                         setState(() => section++);
                       })),
                 ])),
@@ -3533,7 +3761,7 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
                 const SizedBox(height: 12),
                 _Card(
                     child: Column(children: [
-                  Text('Tell me about yourself.',
+                  Text(speakingPrompt,
                       textAlign: TextAlign.center,
                       style: en(22, weight: FontWeight.w700, color: primary)),
                   const SizedBox(height: 16),
