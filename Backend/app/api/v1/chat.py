@@ -93,16 +93,17 @@ def _generate_gemini(prompt: str) -> str:
         },
     }
     # Google occasionally returns 503 (overloaded) or the connection drops.
-    # Retry transient failures before giving up so the user sees a real reply
-    # instead of a spurious "invalid key" message.
+    # Retry once on transient failures — but keep the worst case (2 tries ×
+    # 20s + 1s backoff ≈ 41s) inside the Flutter client's 45s receiveTimeout,
+    # otherwise the app times out before the server finishes retrying.
     last_error: Optional[Exception] = None
-    for attempt in range(3):
+    for attempt in range(2):
         try:
             response = httpx.post(
                 url,
                 params={"key": settings.GEMINI_API_KEY},
                 json=payload,
-                timeout=60.0,
+                timeout=20.0,
             )
             if response.status_code in (429, 500, 502, 503, 504):
                 raise httpx.HTTPStatusError(
@@ -114,8 +115,8 @@ def _generate_gemini(prompt: str) -> str:
             break
         except (httpx.HTTPStatusError, httpx.TransportError) as exc:
             last_error = exc
-            if attempt < 2:
-                time.sleep(1.5 * (attempt + 1))
+            if attempt < 1:
+                time.sleep(1.0)
     else:
         raise last_error if last_error else RuntimeError("Gemini request failed")
     data = response.json()
@@ -480,6 +481,7 @@ async def get_user_stats(
         "user_name": user.name,
         "level": user.level,
         "level_score": user.level_score,
+        "skill_scores": json.loads(user.skill_scores) if user.skill_scores else None,
         "total_sessions": user.total_sessions,
         "streak_days": user.streak_days,
         "statistics": {
