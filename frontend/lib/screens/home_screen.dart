@@ -744,6 +744,14 @@ class _VoiceScreenState extends State<VoiceScreen> {
   }
 
   Future<void> _speakOpening() async {
+    // Chrome/الويب يحجب أي صوت تلقائي قبل أول تفاعل من المستخدم (autoplay
+    // policy). بما أن هذه تنادى من initState، على الويب نكتفي بعرض زر
+    // «استمع للترحيب» اليدوي بدل محاولة تشغيل ستفشل بصمت.
+    if (kIsWeb && !openingPlayed) {
+      if (mounted)
+        setState(() => status = 'اضغط «استمع للترحيب» لسماع opening المدرب بصوت عالٍ.');
+      return;
+    }
     if (openingPlayed) return;
     openingPlayed = true;
     final topicTitle = sessionTopic['title'] ?? '';
@@ -3476,6 +3484,9 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
                     'تم احتساب النتيجة من Grammar وVocabulary وReading وListening، مع تحليل إجابة Speaking.',
                     style: ar(11, color: inkFaint).copyWith(height: 1.6)),
               ])),
+          const SizedBox(height: 14),
+          _RecommendedPackCard(
+              resultLevel: resultLevel, api: widget.api!),
           const SizedBox(height: 18),
           SizedBox(
               width: double.infinity,
@@ -4218,9 +4229,142 @@ class _JournalScreenState extends State<JournalScreen> {
       );
 }
 
-class GoalPacksScreen extends StatelessWidget {
+/// يوصي بأقرب حزمة تدريب بناءً على نتيجة اختبار المستوى.
+/// المنطق: مستوى A1/A2 → IELTS Speaking (بداية منهجية)،
+/// B1/B2 → مقابلة عمل (أكثر تطبيقًا)، C1 → يوصي بمحادثة حرة.
+class _RecommendedPackCard extends StatelessWidget {
+  final String resultLevel;
   final HiwarApi api;
-  const GoalPacksScreen({super.key, required this.api});
+  const _RecommendedPackCard({required this.resultLevel, required this.api});
+
+  Map<String, String> get _recommendation {
+    final level = resultLevel.trim().toUpperCase();
+    if (level.startsWith('A1') || level.startsWith('A2')) {
+      return {
+        'title': 'IELTS Speaking',
+        'subtitle': 'مستواك ابتدائي — نبدأ بكلمات وجمل بسيطة خطوة بخطوة',
+        'icon': '🎯',
+        'reason': 'لأن أساسيات التحدث عندك تحتاج بناءً منهجيًا'
+      };
+    }
+    if (level.startsWith('B1') || level.startsWith('B2')) {
+      return {
+        'title': 'مقابلة عمل',
+        'subtitle': 'مستواك متوسط — جاهز تتدرب على مواقف حقيقية',
+        'icon': '💼',
+        'reason': 'لأنك جاهز لتمارين تطبيقية على مواقف واقعية'
+      };
+    }
+    if (level.startsWith('C')) {
+      // المستوى المتقدم لا يناسبه أي حزمة — نفتح محادثة حرة مباشرة.
+      return {
+        'title': 'محادثة حرة',
+        'subtitle': 'مستواك متقدم — نوّع مواضيعك وطوّر طلاقتك',
+        'icon': '💬',
+        'reason': 'لأن طلاقتك تحتاج تنويع مواضيع أكثر من تمارين أساسية'
+      };
+    }
+    // مستوى غير معروف — نوصي بالحزمة الأوسط.
+    return {
+      'title': 'مقابلة عمل',
+      'subtitle': 'جاهز تتدرب على مواقف حقيقية',
+      'icon': '💼',
+      'reason': 'كخيار متوسط حتى يُحدد مستواك بدقة أكبر'
+    };
+  }
+
+  bool get _isFreeConversation => _recommendation['title'] == 'محادثة حرة';
+
+  @override
+  Widget build(BuildContext context) {
+    final rec = _recommendation;
+    void open() {
+      if (_isFreeConversation) {
+        // C1: محادثة حرة مباشرة بدون شاشة الحزم.
+        Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) => VoiceScreen(
+                    api: api,
+                    initialPrompt:
+                        'Hi! Let\'s have a free conversation. Pick any topic you enjoy — work, travel, ideas — and tell me your thoughts.')));
+        return;
+      }
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => GoalPacksScreen(
+                  api: api, initialPack: rec['title'])));
+    }
+
+    return _Card(
+        onTap: open,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                    color: primaryTint,
+                    borderRadius: BorderRadius.circular(13)),
+                child: Text(rec['icon']!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 22))),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text('الخطوة القادمة المقترحة',
+                      style: ar(11, weight: FontWeight.w700, color: primary)),
+                  const SizedBox(height: 3),
+                  Text('حزمة ${rec['title']}',
+                      style: ar(14, weight: FontWeight.w800)),
+                ])),
+            const Icon(Icons.chevron_left_rounded, color: inkFaint),
+          ]),
+          const SizedBox(height: 10),
+          Text('${rec['subtitle']} — ${rec['reason']}.',
+              style: ar(12, color: inkSoft).copyWith(height: 1.6)),
+          Text('مبني على نتيجة اختبارك: $resultLevel',
+              style: ar(11, color: inkFaint)),
+        ]));
+  }
+}
+
+class GoalPacksScreen extends StatefulWidget {
+  final HiwarApi api;
+  final String? initialPack; // حزمة موصى بها تظهر أولًا (اختياري)
+  const GoalPacksScreen({super.key, required this.api, this.initialPack});
+  @override
+  State<GoalPacksScreen> createState() => _GoalPacksScreenState();
+}
+
+class _GoalPacksScreenState extends State<GoalPacksScreen> {
+  String resultLevel = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLevel();
+  }
+
+  Future<void> _loadLevel() async {
+    try {
+      final userId =
+          await widget.api.getStoredUserId() ?? await widget.api.getUserId();
+      if (userId.isEmpty) return;
+      final profile = await widget.api.getProfile(userId);
+      final level = profile.level.trim();
+      if (level.isNotEmpty &&
+          level != 'pending' &&
+          level.toLowerCase() != 'intermediate') {
+        if (mounted) setState(() => resultLevel = level);
+      }
+    } catch (_) {
+      // بدون مستوى محفوظ — تبقى الحزم على المحتوى الافتراضي.
+    }
+  }
 
   static const packs = <Map<String, String>>[
     {
@@ -4240,6 +4384,14 @@ class GoalPacksScreen extends StatelessWidget {
     },
   ];
 
+  List<Map<String, String>> get _orderedPacks {
+    if (widget.initialPack == null) return packs;
+    final recommended =
+        packs.where((p) => p['title'] == widget.initialPack).toList();
+    final rest = packs.where((p) => p['title'] != widget.initialPack).toList();
+    return [...recommended, ...rest];
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: bg,
@@ -4254,15 +4406,17 @@ class GoalPacksScreen extends StatelessWidget {
               Text('اختر هدفًا قريبًا، وسنحوّل التدريب إلى خطوات يومية قصيرة.',
                   style: ar(12.5, color: inkSoft).copyWith(height: 1.6)),
               const SizedBox(height: 14),
-              for (final pack in packs)
+              for (final pack in _orderedPacks)
                 Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _Card(
                         onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (_) =>
-                                    PackDetailScreen(api: api, pack: pack))),
+                                builder: (_) => PackDetailScreen(
+                                    api: widget.api,
+                                    pack: pack,
+                                    resultLevel: resultLevel))),
                         child: Row(children: [
                           Text(pack['icon']!,
                               style: const TextStyle(fontSize: 25)),
@@ -4287,65 +4441,198 @@ class GoalPacksScreen extends StatelessWidget {
 class PackDetailScreen extends StatelessWidget {
   final HiwarApi api;
   final Map<String, String> pack;
-  const PackDetailScreen({super.key, required this.api, required this.pack});
+  final String? resultLevel; // مستوى المستخدم من اختبار التحديد (اختياري)
+  const PackDetailScreen(
+      {super.key, required this.api, required this.pack, this.resultLevel});
+
+  /// محتوى IELTS Speaking الحقيقي: 5 أيام مختلفة × 3 مستويات.
+  /// كل يوم: [الوصف بالعربي، السؤال الإنجليزي الذي يفتح به المدرب].
+  static const _ieltsContent = <String, List<List<String>>>{
+    'A2': [
+      [
+        'تعلم 10 كلمات أساسية عن نفسك (name, job, family, hobby)',
+        'تدرب على جملة بسيطة: My name is... and I live in...',
+        'Let\'s start easy. Please introduce yourself: your name, where you live, and your job or studies.'
+      ],
+      [
+        'صف عائلتك بثلاث جمل قصيرة (I have... / My mother is...)',
+        'تدرب على نطق الكلمات: brother, sister, work, study',
+        'Tell me about your family. Who is in your family? What do they do?'
+      ],
+      [
+        'تدرب على وصف يومك: Every day I wake up at... Then I...',
+        'Describe your daily routine. What do you do every day, from morning to night?'
+      ],
+      [
+        'تدرب على الإجابة: What do you do in your free time?',
+        'What do you do in your free time? Tell me about one hobby you enjoy.'
+      ],
+      [
+        'محادثة كاملة مع المدرب: تحدث عن نفسك وعائلتك ويومك',
+        'Let\'s review everything. Tell me about yourself, your family, and your typical day. Take your time.'
+      ],
+    ],
+    'B1': [
+      [
+        'راجع مفردات المقارنة: better than, more interesting than',
+        'تدرب على: I prefer... because...',
+        'Do you prefer studying alone or with others? Compare the two and explain why.'
+      ],
+      [
+        'تدرب على الماضي: Last year I... / When I was younger I...',
+        'Tell me about something you did last year that was important to you.'
+      ],
+      [
+        'تدرب على وصف تجربة: The best trip I ever took was...',
+        'Describe the best trip you have ever taken. Where did you go, and what made it special?'
+      ],
+      [
+        'تدرب على التسلسل الزمني: First... After that... Finally...',
+        'Describe how you usually prepare for something important, step by step: first, after that, finally.'
+      ],
+      [
+        'محادثة كاملة: Part 1 أسئلة عامة + Part 2 وصف موضوع دقيقة واحدة',
+        'Part 2: Describe a person who has influenced you. You have one minute — who they are, how you know them, and why they influenced you.'
+      ],
+    ],
+    'B2': [
+      [
+        'مفردات دقيقة: استبدل الكلمات المستهلكة (good, bad, nice) بكلمات أدق',
+        'Tell me about something good that happened recently — but avoid the word "good". Use more precise vocabulary.'
+      ],
+      [
+        'تدرب على إبداء رأي مدعوم: In my view... The main reason being...',
+        'In your view, is social media doing more harm than good? Give a supported opinion.'
+      ],
+      [
+        'تدرب على السؤال الافتراضي: If I had the chance to... I would...',
+        'If you had the chance to live in any country for a year, which would you choose and what would you do there?'
+      ],
+      [
+        'تدرب على الارتباط المنطقي: consequently, nevertheless, on the other hand',
+        'Some say money can buy happiness. Argue for or against, using linking words like consequently or nevertheless.'
+      ],
+      [
+        'محادثة كاملة: Part 2 مناقشة موضوع + Part 3 أسئلة تحليلية معمقة',
+        'Part 3: Should governments invest more in public transport than in roads? Analyze the trade-offs and defend your position.'
+      ],
+    ],
+  };
+
+  List<List<String>> get _daysContent {
+    if (pack['title'] == 'IELTS Speaking') {
+      final level = _detectedLevel;
+      if (_ieltsContent.containsKey(level)) return _ieltsContent[level]!;
+      // مستوى غير معروف → نستخدم B1 كخيار متوسط آمن.
+      return _ieltsContent['B1']!;
+    }
+    // الحزم الأخرى لسا على المحتوى العام القديم.
+    return [
+      ['تعرف على كلمات الموقف الأساسية', 'Tell me about your ${pack['title']!.toLowerCase()} experience.'],
+      ['تدرب على إجابة قصيرة بصوت واضح', 'Give me a short, clear answer: what is the first thing you would do in this situation?'],
+      ['تدرب على إجابة قصيرة بصوت واضح', 'Practice a short spoken answer: describe one useful phrase or word for this situation.'],
+      ['تدرب على إجابة قصيرة بصوت واضح', 'Answer out loud, briefly: what would you say if this happened to you today?'],
+      ['محادثة كاملة مع المدرب', 'Let\'s have a full conversation about your ${pack['title']!.toLowerCase()} experience. Speak freely — I will respond.'],
+    ];
+  }
+
+  String get _detectedLevel {
+    final level = (resultLevel ?? '').trim().toUpperCase();
+    if (level.startsWith('A')) return 'A2';
+    if (level.startsWith('B')) return 'B1';
+    if (level.startsWith('C')) return 'B2';
+    return '';
+  }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        backgroundColor: bg,
-        appBar: AppBar(
-            backgroundColor: bg,
-            elevation: 0,
-            title:
-                Text(pack['title']!, style: ar(16, weight: FontWeight.w700))),
-        body: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
-            children: [
-              _Card(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Text('${pack['icon']}  ${pack['title']}',
-                        style: ar(18, weight: FontWeight.w800)),
-                    const SizedBox(height: 8),
-                    Text(pack['subtitle']!, style: ar(12.5, color: inkSoft)),
-                    const SizedBox(height: 16),
-                    for (var i = 1; i <= 5; i++)
-                      Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: Row(children: [
-                            CircleAvatar(
-                                radius: 13,
-                                backgroundColor: primaryTint,
-                                child: Text('$i',
-                                    style: mono(11, color: primary))),
-                            const SizedBox(width: 10),
-                            Expanded(
-                                child: Text(
-                                    i == 1
-                                        ? 'تعرف على كلمات الموقف الأساسية'
-                                        : i == 5
-                                            ? 'محادثة كاملة مع المدرب'
-                                            : 'تدرب على إجابة قصيرة بصوت واضح',
-                                    style: ar(12.5, color: inkSoft)))
-                          ]))
-                  ])),
-              const SizedBox(height: 14),
-              FilledButton.icon(
-                  onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => VoiceScreen(
-                              api: api,
-                              initialPrompt:
-                                  'Tell me about your ${pack['title']!.toLowerCase()} experience.'))),
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: Text('ابدأ تدريب اليوم',
-                      style: ar(13, weight: FontWeight.w700)),
-                  style: FilledButton.styleFrom(
-                      backgroundColor: primary,
-                      padding: const EdgeInsets.all(15))),
-            ]),
-      );
+  Widget build(BuildContext context) {
+    final days = _daysContent;
+    final hasPersonalized = pack['title'] == 'IELTS Speaking' &&
+        _detectedLevel.isNotEmpty;
+    return Scaffold(
+      backgroundColor: bg,
+      appBar: AppBar(
+          backgroundColor: bg,
+          elevation: 0,
+          title:
+              Text(pack['title']!, style: ar(16, weight: FontWeight.w700))),
+      body: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+          children: [
+            _Card(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text('${pack['icon']}  ${pack['title']}',
+                      style: ar(18, weight: FontWeight.w800)),
+                  const SizedBox(height: 8),
+                  Text(pack['subtitle']!, style: ar(12.5, color: inkSoft)),
+                  if (hasPersonalized) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                            color: primaryTint,
+                            borderRadius: BorderRadius.circular(20)),
+                        child: Text(
+                            'مستوى الخطة: $_detectedLevel (مبني على نتيجة اختبارك)',
+                            style: ar(11,
+                                weight: FontWeight.w700, color: primary))),
+                  ],
+                  const SizedBox(height: 16),
+                  for (var i = 0; i < days.length; i++)
+                    Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => VoiceScreen(
+                                        api: api,
+                                        initialPrompt: days[i].last))),
+                            child: Row(children: [
+                              CircleAvatar(
+                                  radius: 13,
+                                  backgroundColor: primaryTint,
+                                  child: Text('${i + 1}',
+                                      style: mono(11, color: primary))),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                  child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                    for (final task in days[i].take(days[i].length - 1))
+                                      Padding(
+                                          padding:
+                                              const EdgeInsets.only(bottom: 3),
+                                          child: Text(task,
+                                              style: ar(12.5,
+                                                  color: inkSoft))),
+                                  ])),
+                              const Icon(Icons.play_circle_outline_rounded,
+                                  size: 20, color: primary),
+                            ])))
+                ])),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+                onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => VoiceScreen(
+                            api: api,
+                            initialPrompt: days.first.last))),
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: Text('ابدأ تدريب اليوم 1',
+                    style: ar(13, weight: FontWeight.w700)),
+                style: FilledButton.styleFrom(
+                    backgroundColor: primary,
+                    padding: const EdgeInsets.all(15))),
+          ]),
+    );
+  }
 }
 
 class VoiceTimelineScreen extends StatefulWidget {
