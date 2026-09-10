@@ -4524,21 +4524,170 @@ class PackDetailScreen extends StatelessWidget {
     ],
   };
 
+  /// محتوى مقابلة العمل الحقيقي: 5 أيام مختلفة × 3 مستويات.
+  /// كل يوم: [الوصف بالعربي، السؤال الإنجليزي الذي يفتح به المدرب].
+  static const _interviewContent = <String, List<List<String>>>{
+    'A2': [
+      [
+        'تعلم مفردات: experience, skills, apply, position',
+        'تدرب على جملة: I have worked as... for ... years',
+        "Let's start simple. Tell me about yourself and the job you're applying for."
+      ],
+      [
+        'تدرب على: I want this job because...',
+        'Why do you want to work here? Give one or two simple reasons.'
+      ],
+      [
+        'راجع كلمات: hardworking, punctual, friendly, organized',
+        'What are your strengths? Choose two and explain briefly.'
+      ],
+      [
+        'تدرب على سؤال بسيط بنهاية المقابلة: What are the working hours?',
+        "At the end of an interview, they often ask 'Do you have any questions for us?' What would you ask?"
+      ],
+      [
+        'محادثة كاملة: مقابلة عمل قصيرة من البداية للنهاية',
+        "Let's do a short mock interview. Introduce yourself, tell me why you want the job, and ask me one question at the end."
+      ],
+    ],
+    'B1': [
+      [
+        'تدرب على: In my last job, I was responsible for...',
+        'Tell me about your most recent job or a project you worked on. What were your main responsibilities?'
+      ],
+      [
+        'استخدم الماضي: I faced a problem when... so I decided to...',
+        'Describe a challenge you faced at work or school, and how you dealt with it.'
+      ],
+      [
+        'قدّم مثال حقيقي لكل صفة تذكرها',
+        "What is one weakness you're working on improving? Give a specific example."
+      ],
+      [
+        'تدرب على: As part of a team, I...',
+        'Tell me about a time you worked in a team. What was your role?'
+      ],
+      [
+        'محادثة كاملة مع أسئلة متابعة',
+        "Let's do a fuller mock interview: your background, a challenge you solved, and why you're a good fit for this role."
+      ],
+    ],
+    'B2': [
+      [
+        'تعلم منهج STAR: Situation, Task, Action, Result',
+        'Using the STAR method, describe a project where you achieved a measurable result.'
+      ],
+      [
+        'تدرب على سؤال سلوكي صعب: Tell me about a time you failed',
+        'Tell me about a time you disagreed with a manager or colleague. How did you handle it?'
+      ],
+      [
+        'عبارات مهنية: My salary expectation is based on...',
+        'How would you respond if asked about your salary expectations?'
+      ],
+      [
+        'تدرب على تبرير احترافي بدون دفاعية زايدة',
+        "How would you explain a gap in your resume or why you're leaving your current job?"
+      ],
+      [
+        'محادثة كاملة على مستوى متقدم مع أسئلة تحليلية',
+        "Let's do an advanced mock interview covering your experience, a challenge (using STAR), and your career goals."
+      ],
+    ],
+  };
+
+  /// محتوى السفر الحقيقي: 5 أيام مختلفة × 3 مستويات.
+  /// كل يوم: [الوصف بالعربي، السؤال الإنجليزي الذي يفتح به المدرب].
+  static const _travelContent = <String, List<List<String>>>{
+    'A2': [
+      [
+        'كلمات: passport, boarding pass, gate, luggage',
+        "You're at the airport check-in counter. Tell the agent your destination and ask about your gate."
+      ],
+      [
+        'تدرب على: I have a reservation under the name...',
+        "You're checking into a hotel. Tell the receptionist you have a reservation and ask about breakfast times."
+      ],
+      [
+        'كلمات: menu, order, bill, allergic',
+        "You're at a restaurant. Order a meal and ask if it contains nuts."
+      ],
+      [
+        'تدرب على: Excuse me, how do I get to...?',
+        "You're lost in a new city. Ask someone for directions to the nearest train station."
+      ],
+      [
+        'محادثة كاملة: يوم كامل بالمطار والفندق',
+        "Let's roleplay a full travel day: checking in at the airport, then checking into your hotel."
+      ],
+    ],
+    'B1': [
+      [
+        'تدرب على: My flight has been delayed, could you...',
+        'Your flight has been delayed. Talk to the airline staff about rebooking or compensation.'
+      ],
+      [
+        "عبارات مهذبة: I'm sorry to bother you, but...",
+        '(Roleplay) There is a problem with your hotel room (noise, cleanliness). Politely explain the issue to the front desk.'
+      ],
+      [
+        'تدرب على: Could you recommend a good place for...',
+        'Ask a local for restaurant or sightseeing recommendations, and explain what you are interested in.'
+      ],
+      [
+        'استخدم الماضي: Last summer I traveled to...',
+        'Describe a memorable trip you have taken. Where did you go and what did you do?'
+      ],
+      [
+        'محادثة كاملة تتضمن مشكلة غير متوقعة',
+        "Let's roleplay: you missed your connecting flight. Talk to the airline about your options."
+      ],
+    ],
+    'B2': [
+      [
+        'قارن بين خيارين واشرح تفضيلك',
+        'You are comparing two tour packages. Ask detailed questions and explain which one suits you better and why.'
+      ],
+      [
+        'تدرب على شرح مشكلة بتفصيل ورسمية',
+        'Your luggage was lost. Explain the situation in detail to the airline customer service and what you need.'
+      ],
+      [
+        'عبّر عن رأي مدعوم بمثال',
+        'What cultural differences have surprised you when traveling? Discuss with examples.'
+      ],
+      [
+        'تدرب على تسلسل نصائح: First..., Also..., Finally...',
+        'A friend is visiting your country for the first time. Give them detailed advice on what to see and do.'
+      ],
+      [
+        'محادثة كاملة متقدمة بعدة مواقف متتالية',
+        "Let's roleplay an advanced travel scenario: your flight is delayed, then you arrive to find your hotel reservation was cancelled. Handle both issues."
+      ],
+    ],
+  };
+
+  static const Map<String, Map<String, List<List<String>>>> _packContent = {
+    'IELTS Speaking': _ieltsContent,
+    'مقابلة عمل': _interviewContent,
+    'السفر': _travelContent,
+  };
+
   List<List<String>> get _daysContent {
-    if (pack['title'] == 'IELTS Speaking') {
-      final level = _detectedLevel;
-      if (_ieltsContent.containsKey(level)) return _ieltsContent[level]!;
-      // مستوى غير معروف → نستخدم B1 كخيار متوسط آمن.
-      return _ieltsContent['B1']!;
+    final content = _packContent[pack['title']];
+    if (content == null) {
+      // احتياط فقط — كل الحزم الحالية مغطاة بـ_packContent أعلاه.
+      return [
+        [
+          'محادثة حرة مع المدرب',
+          'Tell me about your ${pack['title']!.toLowerCase()} experience.'
+        ],
+      ];
     }
-    // الحزم الأخرى لسا على المحتوى العام القديم.
-    return [
-      ['تعرف على كلمات الموقف الأساسية', 'Tell me about your ${pack['title']!.toLowerCase()} experience.'],
-      ['تدرب على إجابة قصيرة بصوت واضح', 'Give me a short, clear answer: what is the first thing you would do in this situation?'],
-      ['تدرب على إجابة قصيرة بصوت واضح', 'Practice a short spoken answer: describe one useful phrase or word for this situation.'],
-      ['تدرب على إجابة قصيرة بصوت واضح', 'Answer out loud, briefly: what would you say if this happened to you today?'],
-      ['محادثة كاملة مع المدرب', 'Let\'s have a full conversation about your ${pack['title']!.toLowerCase()} experience. Speak freely — I will respond.'],
-    ];
+    final level = _detectedLevel;
+    if (content.containsKey(level)) return content[level]!;
+    // مستوى غير معروف → نستخدم B1 كخيار متوسط آمن.
+    return content['B1']!;
   }
 
   String get _detectedLevel {
@@ -4552,8 +4701,7 @@ class PackDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final days = _daysContent;
-    final hasPersonalized = pack['title'] == 'IELTS Speaking' &&
-        _detectedLevel.isNotEmpty;
+    final hasPersonalized = _detectedLevel.isNotEmpty;
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
