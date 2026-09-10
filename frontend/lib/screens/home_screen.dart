@@ -743,11 +743,12 @@ class _VoiceScreenState extends State<VoiceScreen> {
     ttsConfigured = true;
   }
 
-  Future<void> _speakOpening() async {
+  Future<void> _speakOpening({bool userInitiated = false}) async {
     // Chrome/الويب يحجب أي صوت تلقائي قبل أول تفاعل من المستخدم (autoplay
-    // policy). بما أن هذه تنادى من initState، على الويب نكتفي بعرض زر
-    // «استمع للترحيب» اليدوي بدل محاولة تشغيل ستفشل بصمت.
-    if (kIsWeb && !openingPlayed) {
+    // policy). الاستدعاء التلقائي من initState (userInitiated: false) يكتفي
+    // بعرض زر «استمع للترحيب» اليدوي. لما يضغط المستخدم الزر فعليًا
+    // (userInitiated: true) نكمّل ونشغّل الصوت فعلًا.
+    if (kIsWeb && !userInitiated && !openingPlayed) {
       if (mounted)
         setState(() => status = 'اضغط «استمع للترحيب» لسماع opening المدرب بصوت عالٍ.');
       return;
@@ -969,11 +970,15 @@ class _VoiceScreenState extends State<VoiceScreen> {
         exchanges++;
         sending = false;
         active = true;
-        status = result.analysisCompleted
-            ? 'يتحدث الآن...'
-            : 'تم حفظ كلامك دون اكتمال التحليل';
+        status = !result.analysisCompleted
+            ? 'تم حفظ كلامك دون اكتمال التحليل'
+            : kIsWeb
+                ? 'وصل الرد — اضغط «استمع للرد» لسماعه'
+                : 'يتحدث الآن...';
       });
-      if (result.reply.trim().isNotEmpty && result.analysisCompleted) {
+      if (!kIsWeb &&
+          result.reply.trim().isNotEmpty &&
+          result.analysisCompleted) {
         await _speakReply();
       }
     } catch (error) {
@@ -1069,7 +1074,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
                                       color: inkSoft))),
                           if (!openingPlayed && !listening && !sending)
                             TextButton(
-                              onPressed: _speakOpening,
+                              onPressed: () => _speakOpening(userInitiated: true),
                               child: Text('استمع للترحيب',
                                   style: ar(10.5,
                                       color: primary, weight: FontWeight.w700)),
