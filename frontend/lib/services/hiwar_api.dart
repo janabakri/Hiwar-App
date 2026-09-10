@@ -14,6 +14,9 @@ class HiwarStats {
   final int streakDays;
   final int totalErrors;
   final double masteryRate;
+  // Per-skill breakdown (0-100 each) from the last level test, when
+  // available — keys: grammar, vocabulary, comprehension, speaking.
+  final Map<String, int>? skillScores;
 
   const HiwarStats({
     required this.userId,
@@ -24,6 +27,7 @@ class HiwarStats {
     required this.streakDays,
     required this.totalErrors,
     required this.masteryRate,
+    this.skillScores,
   });
 
   factory HiwarStats.fromJson(Map<String, dynamic> json) {
@@ -38,6 +42,10 @@ class HiwarStats {
       streakDays: (json['streak_days'] as num?)?.toInt() ?? 0,
       totalErrors: (statistics['total_errors'] as num?)?.toInt() ?? 0,
       masteryRate: (statistics['mastery_rate'] as num?)?.toDouble() ?? 0,
+      skillScores: json['skill_scores'] is Map
+          ? (json['skill_scores'] as Map)
+              .map((k, v) => MapEntry('$k', (v as num?)?.toInt() ?? 0))
+          : null,
     );
   }
 }
@@ -46,12 +54,14 @@ class LevelHistoryEntry {
   final int id;
   final String level;
   final int score;
+  final Map<String, int>? skillScores;
   final DateTime? createdAt;
 
   const LevelHistoryEntry({
     required this.id,
     required this.level,
     required this.score,
+    this.skillScores,
     this.createdAt,
   });
 
@@ -60,6 +70,10 @@ class LevelHistoryEntry {
         id: (json['id'] as num?)?.toInt() ?? 0,
         level: '${json['level'] ?? ''}',
         score: (json['score'] as num?)?.toInt() ?? 0,
+        skillScores: json['skill_scores'] is Map
+            ? (json['skill_scores'] as Map)
+                .map((k, v) => MapEntry('$k', (v as num?)?.toInt() ?? 0))
+            : null,
         createdAt: DateTime.tryParse('${json['created_at'] ?? ''}'),
       );
 }
@@ -435,9 +449,20 @@ class HiwarApi {
   Future<void> saveLevelResult(
       {required String userId,
       required String level,
-      required int score}) async {
-    await _dio.post('/api/v1/assessment/level',
-        data: {'user_id': userId, 'level': level, 'score': score});
+      required int score,
+      int? grammarScore,
+      int? vocabularyScore,
+      int? comprehensionScore,
+      int? speakingScore}) async {
+    await _dio.post('/api/v1/assessment/level', data: {
+      'user_id': userId,
+      'level': level,
+      'score': score,
+      if (grammarScore != null) 'grammar_score': grammarScore,
+      if (vocabularyScore != null) 'vocabulary_score': vocabularyScore,
+      if (comprehensionScore != null) 'comprehension_score': comprehensionScore,
+      if (speakingScore != null) 'speaking_score': speakingScore,
+    });
   }
 
   Future<List<LevelHistoryEntry>> getLevelHistory(String userId) async {

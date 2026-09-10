@@ -4,6 +4,7 @@ The current app uses a trusted client user_id; production Google token verificat
 should be added before exposing this API publicly.
 """
 from datetime import datetime, timedelta
+import json
 from jose import jwt, jwk
 import httpx
 from typing import Optional
@@ -182,6 +183,7 @@ def _serialize(user: User):
         "focus_skills": user.focus_skills,
         "level": honest_level,
         "level_score": user.level_score or 0,
+        "skill_scores": json.loads(user.skill_scores) if user.skill_scores else None,
         "total_sessions": user.total_sessions,
         "streak_days": user.streak_days,
         "created_at": user.created_at.isoformat() if user.created_at else None,

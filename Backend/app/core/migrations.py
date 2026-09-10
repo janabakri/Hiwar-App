@@ -21,6 +21,7 @@ def ensure_user_profile_columns(engine) -> None:
         "verification_code": "VARCHAR(10)",
         "verification_expires_at": "DATETIME",
         "email_verified": "BOOLEAN NOT NULL DEFAULT 0",
+        "skill_scores": "TEXT",
     }
     with engine.begin() as connection:
         for name, definition in additions.items():

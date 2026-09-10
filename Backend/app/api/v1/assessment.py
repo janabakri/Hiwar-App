@@ -33,6 +33,13 @@ class LevelResultRequest(BaseModel):
     user_id: str = Field(min_length=1, max_length=120)
     level: str = Field(min_length=2, max_length=10)
     score: int = Field(ge=0, le=100)
+    # Optional per-skill breakdown (0-100 each) from the level test. Optional
+    # for backward compatibility with older app builds that only send the
+    # combined level/score.
+    grammar_score: int | None = Field(default=None, ge=0, le=100)
+    vocabulary_score: int | None = Field(default=None, ge=0, le=100)
+    comprehension_score: int | None = Field(default=None, ge=0, le=100)
+    speaking_score: int | None = Field(default=None, ge=0, le=100)
 
 
 def _ai_json(instruction: str) -> dict | None:
@@ -117,10 +124,24 @@ def save_level_result(request: LevelResultRequest, db: Session = Depends(get_db)
         raise HTTPException(status_code=404, detail="User not found")
     user.level = request.level
     user.level_score = request.score
+    skills = {
+        "grammar": request.grammar_score,
+        "vocabulary": request.vocabulary_score,
+        "comprehension": request.comprehension_score,
+        "speaking": request.speaking_score,
+    }
+    provided = {k: v for k, v in skills.items() if v is not None}
+    skill_scores_json = json.dumps(provided) if provided else None
+    user.skill_scores = skill_scores_json
     # Keep the FULL history — every attempt is a new row, never overwritten.
-    db.add(LevelHistory(user_id=user.user_id, level=request.level, score=request.score))
+    db.add(LevelHistory(user_id=user.user_id, level=request.level, score=request.score, skill_scores=skill_scores_json))
     db.commit()
-    return {"user_id": user.user_id, "level": user.level, "level_score": user.level_score}
+    return {
+        "user_id": user.user_id,
+        "level": user.level,
+        "level_score": user.level_score,
+        "skill_scores": provided or None,
+    }
 
 
 @router.get("/assessment/level-history/{user_id}")
@@ -140,6 +161,7 @@ def get_level_history(user_id: str, db: Session = Depends(get_db), current_user:
                 "id": row.id,
                 "level": row.level,
                 "score": row.score,
+                "skill_scores": json.loads(row.skill_scores) if row.skill_scores else None,
                 "created_at": row.created_at.isoformat() if row.created_at else None,
             }
             for row in rows

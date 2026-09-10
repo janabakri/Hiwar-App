@@ -10,7 +10,7 @@ from .journal import JournalEntry  # noqa: F401  # register relationship target
 
 class User(Base):
     __tablename__ = "users"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String(50), unique=True, index=True, nullable=False)
     name = Column(String(50), nullable=False)
@@ -30,22 +30,26 @@ class User(Base):
     verification_code = Column(String(64), nullable=True)
     verification_expires_at = Column(DateTime, nullable=True)
     email_verified = Column(Boolean, default=False, nullable=False)
-    
+
     # Level and progress
     level = Column(String(20), default="pending")
     level_score = Column(Integer, default=0)
-    
+    # JSON string of the last level test's per-skill breakdown, e.g.
+    # {"grammar": 80, "vocabulary": 60, "comprehension": 100, "speaking": 65}
+    # (0-100 each). Nullable — older accounts and manual sign-ins won't have it.
+    skill_scores = Column(Text, nullable=True)
+
     # Statistics
     total_sessions = Column(Integer, default=0)
     total_errors = Column(Integer, default=0)
     mastered_errors = Column(Integer, default=0)
     streak_days = Column(Integer, default=0)
-    
+
     # Status
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_active = Column(DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     errors = relationship("UserError", back_populates="user")
     conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
