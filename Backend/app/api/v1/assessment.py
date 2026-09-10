@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from ...core.config import settings
 from ...core.database import get_db
 from ...models.user import User
+from ...models.level_history import LevelHistory
 from ...core.security import enforce_owner, get_current_user
 
 router = APIRouter()
@@ -116,5 +117,31 @@ def save_level_result(request: LevelResultRequest, db: Session = Depends(get_db)
         raise HTTPException(status_code=404, detail="User not found")
     user.level = request.level
     user.level_score = request.score
+    # Keep the FULL history — every attempt is a new row, never overwritten.
+    db.add(LevelHistory(user_id=user.user_id, level=request.level, score=request.score))
     db.commit()
     return {"user_id": user.user_id, "level": user.level, "level_score": user.level_score}
+
+
+@router.get("/assessment/level-history/{user_id}")
+def get_level_history(user_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    enforce_owner(user_id, current_user)
+    rows = (
+        db.query(LevelHistory)
+        .filter(LevelHistory.user_id == user_id)
+        .order_by(LevelHistory.created_at.asc(), LevelHistory.id.asc())
+        .all()
+    )
+    return {
+        "user_id": user_id,
+        "count": len(rows),
+        "entries": [
+            {
+                "id": row.id,
+                "level": row.level,
+                "score": row.score,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+            }
+            for row in rows
+        ],
+    }

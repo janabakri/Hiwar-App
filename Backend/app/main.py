@@ -16,6 +16,7 @@ from .core.migrations import ensure_user_profile_columns
 from .api.v1 import chat, profile, assessment, journal, conversations, tts
 from .models import conversation  # noqa: F401  # register Conversation before create_all
 from .models import journal as journal_model  # noqa: F401  # register JournalEntry before create_all
+from .models import level_history as level_history_model  # noqa: F401  # register LevelHistory before create_all
 
 # Logging: use LOG_FILE/LOG_LEVEL from settings instead of bare print().
 def _configure_logging() -> None:

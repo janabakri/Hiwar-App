@@ -42,6 +42,28 @@ class HiwarStats {
   }
 }
 
+class LevelHistoryEntry {
+  final int id;
+  final String level;
+  final int score;
+  final DateTime? createdAt;
+
+  const LevelHistoryEntry({
+    required this.id,
+    required this.level,
+    required this.score,
+    this.createdAt,
+  });
+
+  factory LevelHistoryEntry.fromJson(Map<String, dynamic> json) =>
+      LevelHistoryEntry(
+        id: (json['id'] as num?)?.toInt() ?? 0,
+        level: '${json['level'] ?? ''}',
+        score: (json['score'] as num?)?.toInt() ?? 0,
+        createdAt: DateTime.tryParse('${json['created_at'] ?? ''}'),
+      );
+}
+
 class HiwarProfile {
   final String userId;
   final String name;
@@ -416,6 +438,16 @@ class HiwarApi {
       required int score}) async {
     await _dio.post('/api/v1/assessment/level',
         data: {'user_id': userId, 'level': level, 'score': score});
+  }
+
+  Future<List<LevelHistoryEntry>> getLevelHistory(String userId) async {
+    final response =
+        await _dio.get('/api/v1/assessment/level-history/${Uri.encodeComponent(userId)}');
+    final data = Map<String, dynamic>.from(response.data as Map);
+    return ((data['entries'] as List?) ?? const [])
+        .map((item) =>
+            LevelHistoryEntry.fromJson(Map<String, dynamic>.from(item as Map)))
+        .toList();
   }
 
   Future<List<HiwarError>> getErrors(String userId) async {
