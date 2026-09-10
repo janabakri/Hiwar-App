@@ -3509,57 +3509,72 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
     }
   }
 
+  // Result visual language follows the attached reference: label row, CEFR badge,
+  // percentage bar, then compact international-test tiles. Values remain real
+  // measurements from the assessment state; only the presentation is decorative.
+  Color _cefrBadgeFill(String code) {
+    switch (code) {
+      case 'B1':
+        return const Color(0xFFFAEEDA);
+      case 'B2':
+        return const Color(0xFFEAF3DE);
+      case 'C1':
+        return const Color(0xFFEEEDFE);
+      default:
+        return const Color(0xFFE7EEF7);
+    }
+  }
+
   Widget _skillRow(String label, int percent) {
     final code = cefrCode(percent);
-    final color = _cefrBadgeColor(code);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final badgeTextColor = _cefrBadgeColor(code);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             children: [
-              Text(label, style: ar(12.5, weight: FontWeight.w700)),
-              const SizedBox(height: 6),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
-                  value: percent / 100,
-                  minHeight: 6,
-                  backgroundColor: primaryTint,
-                  color: primary,
+              Expanded(child: Text(label, style: ar(12.5, weight: FontWeight.w700))),
+              Text('$percent%', style: mono(12.5, color: inkFaint)),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _cefrBadgeFill(code),
+                  borderRadius: BorderRadius.circular(7),
                 ),
+                child: Text(code,
+                    style: ar(10.5, weight: FontWeight.w800, color: badgeTextColor)),
               ),
             ],
           ),
-        ),
-        const SizedBox(width: 12),
-        Text('$percent%', style: mono(13, color: primary)),
-        const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: color.withOpacity(.15),
-            borderRadius: BorderRadius.circular(8),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: (percent.clamp(0, 100)) / 100,
+              minHeight: 6,
+              backgroundColor: const Color(0xFFEEEAE4),
+              color: primary,
+            ),
           ),
-          child: Text(code,
-              style: ar(11, weight: FontWeight.w800, color: color)),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _testEquivalentTile(String name, String range) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+      padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 8),
       decoration: BoxDecoration(
         color: primaryTint,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(children: [
-        Text(name, style: ar(12, weight: FontWeight.w700, color: primary)),
-        const SizedBox(height: 6),
-        Text(range, style: mono(16, color: primary)),
+        Text(name, style: ar(11.5, weight: FontWeight.w700, color: primary)),
+        const SizedBox(height: 4),
+        Text(range, style: mono(15, weight: FontWeight.w700, color: primaryDark)),
       ]),
     );
   }
