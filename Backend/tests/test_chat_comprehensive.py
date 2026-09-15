@@ -5,7 +5,7 @@ Tests include database interactions, user management, and error tracking.
 
 import sys
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 from sqlalchemy import create_engine
@@ -237,12 +237,12 @@ class TestChatEndpoint:
         test_db.commit()
         test_db.refresh(user)
 
-        before = datetime.utcnow()
+        before = datetime.now(timezone.utc)
         chat(
             ChatMessage(message="I am go", user_id="user_time"),
             db=test_db
         )
-        after = datetime.utcnow()
+        after = datetime.now(timezone.utc)
 
         error = test_db.query(UserError).filter(UserError.user_id == user.id).first()
         if error:
@@ -311,11 +311,11 @@ class TestUserModel:
 
     async def test_user_timestamps(self, test_db):
         """Test that user timestamps are properly set."""
-        before = datetime.utcnow()
+        before = datetime.now(timezone.utc)
         user = User(user_id="time_user", name="Time User")
         test_db.add(user)
         test_db.commit()
-        after = datetime.utcnow()
+        after = datetime.now(timezone.utc)
         test_db.refresh(user)
 
         assert before <= user.created_at <= after

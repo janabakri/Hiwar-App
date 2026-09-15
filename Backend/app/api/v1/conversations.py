@@ -1,7 +1,7 @@
 """Past conversations, smart suggestions and spaced-repetition review."""
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -158,7 +158,7 @@ def review_queue(
 ) -> Dict[str, Any]:
     """Errors that are due for a spaced-repetition review session."""
     user = _resolve_user(user_id, current_user, db)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     unmastered = (
         db.query(UserError)
         .filter(UserError.user_id == user.id, UserError.mastered == False)  # noqa: E712
@@ -210,6 +210,6 @@ def review_answer(
             error.mastered = True
     else:
         error.count = 1
-    error.last_occurrence = datetime.utcnow()
+    error.last_occurrence = datetime.now(timezone.utc)
     db.commit()
     return {"error_id": error.id, "mastered": bool(error.mastered), "next_stage": error.count}

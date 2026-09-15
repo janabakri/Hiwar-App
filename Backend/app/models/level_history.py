@@ -6,9 +6,9 @@ keeps the FULL history so the app can prove real progress over time
 ("improved from 60% to 75%") with the user's own numbers, not marketing.
 """
 
-from sqlalchemy import Column, Integer, String, DateTime, Index, Text
-from datetime import datetime
+from sqlalchemy import Column, Integer, String, Index, Text
 
+from ..core.aware_datetime import UTCDateTime, utc_now
 from ..core.database import Base
 
 
@@ -22,7 +22,7 @@ class LevelHistory(Base):
     # Same JSON shape as User.skill_scores, e.g.
     # {"grammar": 80, "vocabulary": 60, "comprehension": 100, "speaking": 65}
     skill_scores = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(UTCDateTime, default=utc_now, nullable=False)
 
     __table_args__ = (
         Index("ix_level_history_user_created", "user_id", "created_at"),

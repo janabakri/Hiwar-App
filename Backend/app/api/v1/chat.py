@@ -5,7 +5,7 @@ Chat API endpoints with database integration.
 import json
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 import httpx
@@ -202,7 +202,7 @@ def chat(
         if existing_error:
             # Increment count
             existing_error.count += 1
-            existing_error.last_occurrence = datetime.utcnow()
+            existing_error.last_occurrence = datetime.now(timezone.utc)
             logger.info("Error repeated: %s (count: %s)", existing_error.wrong_text, existing_error.count)
         else:
             # Create new error
@@ -352,8 +352,8 @@ def chat(
 
     assistant_message = Message(conversation_id=conversation.id, role="assistant", content=reply)
     db.add(assistant_message)
-    conversation.updated_at = datetime.utcnow()
-    user.last_active = datetime.utcnow()
+    conversation.updated_at = datetime.now(timezone.utc)
+    user.last_active = datetime.now(timezone.utc)
     db.commit()
     db.refresh(assistant_message)
 

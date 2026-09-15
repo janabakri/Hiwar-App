@@ -1,6 +1,6 @@
 """JWT authentication and ownership enforcement shared by protected endpoints."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -18,7 +18,7 @@ bearer = HTTPBearer(auto_error=False)
 def create_access_token(user: User) -> str:
     if not settings.SECRET_KEY:
         raise RuntimeError("SECRET_KEY is required to issue access tokens")
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     return jwt.encode(
         {
             "sub": user.user_id,

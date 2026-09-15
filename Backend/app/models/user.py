@@ -2,9 +2,9 @@
 User model for storing account information.
 """
 
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text
+from sqlalchemy import Column, Integer, String, Boolean, Text
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from ..core.aware_datetime import UTCDateTime, utc_now
 from ..core.database import Base
 from .journal import JournalEntry  # noqa: F401  # register relationship target
 
@@ -28,7 +28,7 @@ class User(Base):
     profile_complete = Column(Boolean, default=False, nullable=False)
     password_hash = Column(String(255), nullable=True)
     verification_code = Column(String(64), nullable=True)
-    verification_expires_at = Column(DateTime, nullable=True)
+    verification_expires_at = Column(UTCDateTime, nullable=True)
     email_verified = Column(Boolean, default=False, nullable=False)
 
     # Level and progress
@@ -47,8 +47,8 @@ class User(Base):
 
     # Status
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    last_active = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(UTCDateTime, default=utc_now)
+    last_active = Column(UTCDateTime, default=utc_now, onupdate=utc_now)
 
     # Relationships
     errors = relationship("UserError", back_populates="user")

@@ -3,7 +3,7 @@
 The current app uses a trusted client user_id; production Google token verification
 should be added before exposing this API publicly.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 from jose import jwt, jwk
 import httpx
@@ -206,7 +206,7 @@ def sign_up(request: SignUpRequest, db: Session = Depends(get_db)):
     user.email = email
     user.password_hash = _hash_password(request.password)
     user.verification_code = _verification_digest(email, code)
-    user.verification_expires_at = datetime.utcnow() + timedelta(minutes=10)
+    user.verification_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
     user.email_verified = False
     user.auth_provider = "email"
     db.commit()
@@ -225,12 +225,12 @@ def verify_email(request: VerifyEmailRequest, db: Session = Depends(get_db)):
     code = _normalize_verification_code(request.code)
     user = db.query(User).filter(User.email == email).first()
     expected = _verification_digest(email, code)
-    if not user or not hmac.compare_digest(user.verification_code or '', expected) or not user.verification_expires_at or user.verification_expires_at < datetime.utcnow():
+    if not user or not hmac.compare_digest(user.verification_code or '', expected) or not user.verification_expires_at or user.verification_expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="رمز التحقق غير صحيح أو منتهي")
     user.email_verified = True
     user.verification_code = None
     user.verification_expires_at = None
-    user.last_active = datetime.utcnow()
+    user.last_active = datetime.now(timezone.utc)
     db.commit()
     db.refresh(user)
     result = _serialize(user)
@@ -247,7 +247,7 @@ def password_sign_in(request: PasswordSignInRequest, db: Session = Depends(get_d
         raise HTTPException(status_code=401, detail="البريد أو كلمة المرور غير صحيحة")
     if not user.email_verified:
         raise HTTPException(status_code=403, detail="تحققي من بريدك الإلكتروني أولًا")
-    user.last_active = datetime.utcnow()
+    user.last_active = datetime.now(timezone.utc)
     db.commit()
     db.refresh(user)
     result = _serialize(user)
@@ -282,7 +282,7 @@ def sign_in(request: SignInRequest, db: Session = Depends(get_db)):
     user.auth_provider = request.auth_provider
     user.auth_subject = verified_subject
     user.email_verified = True
-    user.last_active = datetime.utcnow()
+    user.last_active = datetime.now(timezone.utc)
     db.commit()
     db.refresh(user)
     result = _serialize(user)
@@ -334,7 +334,7 @@ def update_profile(request: ProfileUpdateRequest, db: Session = Depends(get_db),
     user.daily_minutes = request.daily_minutes
     user.focus_skills = request.focus_skills
     user.profile_complete = True
-    user.last_active = datetime.utcnow()
+    user.last_active = datetime.now(timezone.utc)
     db.commit()
     db.refresh(user)
     return _serialize(user)
