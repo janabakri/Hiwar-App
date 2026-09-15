@@ -925,8 +925,8 @@ class _VoiceScreenState extends State<VoiceScreen> {
       if (mounted) setState(() => status = 'صوت المدرب يعمل الآن');
     } catch (_) {
       if (mounted)
-        setState(() => status =
-            'تعذر تشغيل الصوت تلقائيًا. اضغط «استمع للرد» مرة أخرى أو تحقق من صوت Chrome.');
+        setState(() =>
+            status = 'تعذر تشغيل الصوت. تحقق من مستوى صوت الجهاز ثم أعد المحادثة.');
     }
   }
 
@@ -972,13 +972,9 @@ class _VoiceScreenState extends State<VoiceScreen> {
         active = true;
         status = !result.analysisCompleted
             ? 'تم حفظ كلامك دون اكتمال التحليل'
-            : kIsWeb
-                ? 'وصل الرد — اضغط «استمع للرد» لسماعه'
-                : 'يتحدث الآن...';
+            : 'يتحدث الآن...';
       });
-      if (!kIsWeb &&
-          result.reply.trim().isNotEmpty &&
-          result.analysisCompleted) {
+      if (result.reply.trim().isNotEmpty && result.analysisCompleted) {
         await _speakReply();
       }
     } catch (error) {
@@ -1188,18 +1184,6 @@ class _VoiceScreenState extends State<VoiceScreen> {
                               Text(reply,
                                   style: en(13, color: inkSoft)
                                       .copyWith(height: 1.55)),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton.icon(
-                                onPressed: sending ? null : _speakReply,
-                                icon: const Icon(Icons.play_arrow_rounded,
-                                    size: 17),
-                                label: Text('استمع للرد',
-                                    style: ar(11.5,
-                                        color: primary,
-                                        weight: FontWeight.w700)),
-                              ),
-                            ),
                           ],
                         ),
                       ),
@@ -1830,7 +1814,7 @@ class ProgressContent extends StatelessWidget {
                         children: [
                       Text('محادثاتك السابقة',
                           style: ar(14, weight: FontWeight.w700)),
-                      Text('اقرأ أي جلسة كاملة وقت ما بدك',
+                      Text('اقرأ أي جلسة كاملة وقت ما تبي',
                           style: ar(11.5, color: inkFaint))
                     ])),
                 const Icon(Icons.chevron_left_rounded, color: inkFaint)
@@ -3271,10 +3255,14 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
     }
     setState(() => analyzing = true);
     try {
+      // مهلة قصيرة حتى ما يعلّق المستخدم بالانتظار إذا تأخر مزود الذكاء الاصطناعي.
       speakingAnalysis = await widget.api!.assessSpeaking(
-          userId: widget.userId!,
-          prompt: speakingPrompt,
-          transcript: spokenText);
+              userId: widget.userId!,
+              prompt: speakingPrompt,
+              transcript: spokenText)
+          .timeout(const Duration(seconds: 15), onTimeout: () {
+        throw StateError('AI_TIMEOUT');
+      });
     } catch (_) {
       speakingAnalysis = {
         'estimated_level': 'pending',
@@ -3300,13 +3288,21 @@ class _LevelCheckScreenState extends State<LevelCheckScreen> {
     final aiLevelIsValid = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
         .any((level) => remoteLevel.startsWith(level));
     final estimated = aiLevelIsValid ? remoteLevel : computedLevel;
+    // الخادم يقبل رمز مستوى قصير فقط (حتى 10 أحرف) — نحفظ CEFR فقط مثل B1.
+    final estimatedShort = estimated.trim().split(RegExp(r'\s+')).first;
     String? saveError;
     try {
       await widget.api!.saveLevelResult(
-          userId: widget.userId!, level: estimated, score: finalScore);
-    } catch (_) {
+          userId: widget.userId!,
+          level: estimatedShort,
+          score: finalScore,
+          grammarScore: grammarPercent,
+          vocabularyScore: vocabPercent,
+          comprehensionScore: comprehensionPercent,
+          speakingScore: speakingScore);
+    } catch (error) {
       saveError =
-          'تعذر حفظ النتيجة على الحساب. ستظهر النتيجة هنا، ويمكنك إعادة المحاولة لاحقًا إذا لم تظهر في الرئيسية.';
+          'تعذر حفظ النتيجة على الحساب (${HiwarApi.describeError(error)}). النتيجة معروضة هنا، ويمكنك إعادة الاختبار لاحقًا.';
     }
     if (!mounted) return;
     setState(() {

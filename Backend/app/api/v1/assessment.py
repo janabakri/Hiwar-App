@@ -58,7 +58,9 @@ def _ai_json(instruction: str) -> dict | None:
                     "contents": [{"role": "user", "parts": [{"text": instruction}]}],
                     "generationConfig": {
                         "temperature": 0.1,
-                        "maxOutputTokens": 500,
+                        # 500 tokens was truncating the JSON mid-string
+                        # ("Unterminated string") — keep enough room.
+                        "maxOutputTokens": 1000,
                         "responseMimeType": "application/json",
                     },
                 },

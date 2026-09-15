@@ -93,9 +93,8 @@ def _generate_gemini(prompt: str) -> str:
         },
     }
     # Google occasionally returns 503 (overloaded) or the connection drops.
-    # Retry once on transient failures — but keep the worst case (2 tries ×
-    # 20s + 1s backoff ≈ 41s) inside the Flutter client's 45s receiveTimeout,
-    # otherwise the app times out before the server finishes retrying.
+    # Retry once on transient failures — but keep the worst case short
+    # (2 tries × 12s + 0.5s backoff ≈ 25s) so the learner gets a reply fast.
     last_error: Optional[Exception] = None
     for attempt in range(2):
         try:
@@ -103,7 +102,7 @@ def _generate_gemini(prompt: str) -> str:
                 url,
                 params={"key": settings.GEMINI_API_KEY},
                 json=payload,
-                timeout=20.0,
+                timeout=12.0,
             )
             if response.status_code in (429, 500, 502, 503, 504):
                 raise httpx.HTTPStatusError(
@@ -116,7 +115,7 @@ def _generate_gemini(prompt: str) -> str:
         except (httpx.HTTPStatusError, httpx.TransportError) as exc:
             last_error = exc
             if attempt < 1:
-                time.sleep(1.0)
+                time.sleep(0.5)
     else:
         raise last_error if last_error else RuntimeError("Gemini request failed")
     data = response.json()
