@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 // مرجع التكامل: Hiwar FastAPI تحت /api/v1؛ إحصائيات الحساب من GET /stats/{user_id}.
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -499,6 +501,92 @@ class HiwarApi {
     });
     return HiwarChatResult.fromJson(
         Map<String, dynamic>.from(response.data as Map));
+  }
+
+  /// Sends the chat message and streams the reply over Server-Sent Events.
+  ///
+  /// [onMeta] fires once with the conversation id, [onChunk] fires per
+  /// sentence-ish piece of the reply, and [onDone] fires with the complete
+  /// result (corrections, tips, message id, analysis flags). Falls back to a
+  /// normal POST /chat if the stream fails before any chunk arrives, so the
+  /// caller always gets a result.
+  Future<HiwarChatResult> sendChatStream(
+      {required String userId,
+      required String message,
+      int? conversationId,
+      String? tutorInstruction,
+      void Function(int conversationId)? onMeta,
+      void Function(String text)? onChunk}) async {
+    final body = {
+      'message': message,
+      'user_id': userId,
+      if (conversationId != null) 'conversation_id': conversationId,
+      if (tutorInstruction != null && tutorInstruction.trim().isNotEmpty)
+        'tutor_instruction': tutorInstruction.trim(),
+    };
+
+    try {
+      final response = await _dio.post<ResponseBody>(
+        '/api/v1/chat/stream',
+        data: body,
+        options: Options(responseType: ResponseType.stream),
+      );
+      final stream = response.data!;
+      HiwarChatResult? result;
+      String buffer = '';
+      await for (final bytes in stream.stream) {
+        buffer += utf8.decode(bytes, allowMalformed: true);
+        // SSE events are separated by a blank line.
+        while (buffer.contains('\n\n')) {
+          final idx = buffer.indexOf('\n\n');
+          final rawEvent = buffer.substring(0, idx);
+          buffer = buffer.substring(idx + 2);
+
+          String eventName = 'message';
+          final dataLines = <String>[];
+          for (final line in rawEvent.split('\n')) {
+            if (line.startsWith('event: ')) {
+              eventName = line.substring(7).trim();
+            } else if (line.startsWith('data: ')) {
+              dataLines.add(line.substring(6));
+            }
+          }
+          if (dataLines.isEmpty) continue;
+          final data = jsonDecode(dataLines.join('\n'));
+          if (data is! Map<String, dynamic>) continue;
+
+          if (eventName == 'meta') {
+            final cid = (data['conversation_id'] as num?)?.toInt();
+            if (cid != null) onMeta?.call(cid);
+          } else if (eventName == 'reply_chunk') {
+            final text = '${data['text'] ?? ''}';
+            if (text.isNotEmpty) onChunk?.call(text);
+          } else if (eventName == 'final') {
+            result = HiwarChatResult.fromJson(data);
+          }
+        }
+      }
+      if (result == null) {
+        throw StateError('EMPTY_STREAM');
+      }
+      return result;
+    } on DioException catch (error) {
+      // The stream failed before producing anything — fall back to the
+      // plain endpoint so the learner still gets a reply.
+      if (error.response == null) rethrow;
+      return sendChat(
+          userId: userId,
+          message: message,
+          conversationId: conversationId,
+          tutorInstruction: tutorInstruction);
+    } on StateError {
+      // No 'final' event arrived; try the plain endpoint as a safety net.
+      return sendChat(
+          userId: userId,
+          message: message,
+          conversationId: conversationId,
+          tutorInstruction: tutorInstruction);
+    }
   }
 
   Future<HiwarJournalResult> analyzeJournal(

@@ -7,10 +7,11 @@ import logging
 import re
 import time
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Dict, Generator, List, Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -559,6 +560,252 @@ def chat(
         message_id=assistant_message.id,
         analysis_completed=analysis_completed,
         analysis_message=analysis_message,
+    )
+
+
+def _sse_event(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+def _chunk_sentences(text: str) -> List[str]:
+    """Split a finished reply into speakable chunks (sentence-ish)."""
+    parts = [p.strip() for p in re.split(r"(?<=[.!?؟])\s+", text) if p.strip()]
+    return parts or ([text.strip()] if text.strip() else [])
+
+
+@router.post("/chat/stream")
+def chat_stream(
+    request: ChatMessage,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Same tutor pipeline as /chat, but streams the reply over SSE.
+
+    Event order: meta (conversation_id) -> reply chunk(s) -> final
+    (corrections, tips, message_id, analysis flags). The client can start
+    showing/speaking the reply before analysis metadata arrives.
+    """
+
+    # -- Shared preparation logic with /chat (kept in-line: DB session is
+    #    request-scoped; a generator can't safely use a closed session).
+    user = _resolve_user(request.user_id, current_user, db)
+
+    conversation = None
+    if request.conversation_id is not None:
+        conversation = db.query(Conversation).filter(
+            Conversation.id == request.conversation_id,
+            Conversation.user_id == user.id,
+            Conversation.is_active == 1,
+        ).first()
+    if conversation is None:
+        conversation = db.query(Conversation).filter(
+            Conversation.user_id == user.id,
+            Conversation.is_active == 1,
+        ).order_by(Conversation.updated_at.desc()).first()
+    if conversation is None:
+        conversation = Conversation(user_id=user.id)
+        db.add(conversation)
+        db.flush()
+
+    previous_messages = db.query(Message).filter(
+        Message.conversation_id == conversation.id,
+    ).order_by(Message.created_at.desc()).limit(6).all()
+    previous_messages.reverse()
+    user_message = Message(conversation_id=conversation.id, role="user", content=request.message)
+    db.add(user_message)
+    db.flush()
+    history = [
+        {"role": item.role, "content": item.content}
+        for item in previous_messages
+        if item.role in {"user", "assistant"} and item.content
+    ]
+
+    errors = detect_errors(request.message)
+    fresh_errors = []
+    handled_error_keys = set()
+    for error_data in errors:
+        handled_error_keys.add(_normalize_error_text(error_data["wrong_text"]))
+        if _upsert_user_error(
+            db, user,
+            wrong_text=error_data["wrong_text"],
+            correct_text=error_data["correct_text"],
+            explanation=error_data["explanation"],
+            error_type=error_data["error_type"],
+            context=request.message,
+        ):
+            fresh_errors.append(error_data)
+    db.commit()
+
+    known_errors = db.query(UserError).filter(
+        UserError.user_id == user.id,
+        UserError.mastered == False,  # noqa: E712
+    ).order_by(UserError.count.desc(), UserError.last_occurrence.desc()).limit(
+        MAX_KNOWN_ERRORS_IN_PROMPT
+    ).all()
+
+    assessed_level = (user.level or '').strip().lower()
+    tutor_level = assessed_level if assessed_level not in {'', 'pending', 'intermediate'} or (user.level_score or 0) > 0 else 'not assessed yet'
+
+    system_prompt = _build_system_prompt(
+        tutor_level, known_errors, errors, request.tutor_instruction
+    )
+    conversation_messages = history + [{"role": "user", "content": request.message}]
+
+    provider = settings.AI_TEXT_PROVIDER.strip().lower()
+    if provider not in {'gemini', 'openai'}:
+        provider = 'gemini' if settings.GEMINI_API_KEY else 'openai'
+    provider_key_available = bool(
+        settings.GEMINI_API_KEY if provider == 'gemini' else settings.OPENAI_API_KEY
+    )
+
+    def _call_openai() -> str:
+        client = OpenAI(
+            api_key=settings.OPENAI_API_KEY,
+            base_url=settings.OPENAI_BASE_URL,
+        )
+        response = client.chat.completions.create(
+            model=settings.OPENAI_MODEL,
+            messages=[{"role": "system", "content": system_prompt}] + conversation_messages,
+            temperature=TUTOR_TEMPERATURE,
+            max_tokens=500,
+            response_format={"type": "json_object"},
+        )
+        return response.choices[0].message.content or ""
+
+    def _generate() -> Generator[str, None, None]:
+        reply = ''
+        corrections: List[Dict[str, str]] = []
+        tips: List[str] = []
+        analysis_completed = False
+        analysis_message: Optional[str] = 'لم يكتمل تحليل الذكاء الاصطناعي لهذه الرسالة.'
+
+        yield _sse_event("meta", {"conversation_id": conversation.id})
+
+        if provider_key_available:
+            try:
+                if provider == 'gemini':
+                    try:
+                        raw_output = _generate_gemini(system=system_prompt, messages=conversation_messages)
+                    except Exception as gemini_exc:
+                        if settings.OPENAI_API_KEY:
+                            logger.warning("Gemini failed (%s); falling back to OpenAI", gemini_exc)
+                            raw_output = _call_openai()
+                        else:
+                            raise
+                else:
+                    raw_output = _call_openai()
+
+                try:
+                    parsed = _parse_json_object(raw_output)
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    plain_reply = raw_output.strip()
+                    if not plain_reply:
+                        raise
+                    parsed = {"reply": plain_reply, "corrections": [], "tips": []}
+
+                if isinstance(parsed.get("reply"), str) and parsed["reply"].strip():
+                    reply = _limit_reply(parsed["reply"].strip())
+                    analysis_completed = True
+                    analysis_message = None
+                if isinstance(parsed.get("corrections"), list):
+                    ai_corrections = [
+                        item for item in parsed["corrections"]
+                        if isinstance(item, dict)
+                        and str(item.get("wrong", "")).strip()
+                        and str(item.get("correct", "")).strip()
+                        and _normalize_error_text(item["wrong"]) != _normalize_error_text(item["correct"])
+                    ][:MAX_CORRECTIONS]
+                    corrections = [
+                        {
+                            "wrong": str(item["wrong"]).strip(),
+                            "correct": str(item["correct"]).strip(),
+                            "explanation": str(item.get("explanation", "")).strip(),
+                        }
+                        for item in ai_corrections
+                    ]
+                    normalized_message = _normalize_error_text(request.message)
+                    for item in ai_corrections:
+                        key = _normalize_error_text(item["wrong"])
+                        if not key or key in handled_error_keys or key not in normalized_message:
+                            continue
+                        handled_error_keys.add(key)
+                        _upsert_user_error(
+                            db, user,
+                            wrong_text=item["wrong"],
+                            correct_text=item["correct"],
+                            explanation=item.get("explanation", ""),
+                            error_type=str(item.get("type", "grammar")).lower(),
+                            context=request.message,
+                        )
+                tips = [str(item) for item in parsed.get("tips", []) if item][:MAX_TIPS]
+            except (json.JSONDecodeError, TypeError, ValueError):
+                logger.warning("AI structured output error (stream)")
+                analysis_message = 'لم يكتمل التحليل المنظم لهذه الرسالة، لكن يمكنك متابعة المحادثة.'
+            except Exception as exc:
+                logger.exception("AI chat provider error (stream)")
+                message = str(exc).lower()
+                if '429' in message or 'quota' in message or 'insufficient_quota' in message:
+                    analysis_message = 'لم يكتمل تحليل هذه الرسالة لأن حد استخدام مزود AI انتهى.'
+                elif 'api key not valid' in message or 'invalid api key' in message or 'permission denied' in message or '401' in message or '403' in message:
+                    analysis_message = 'مفتاح Gemini غير صالح أو غير مفعّل. راجع إعدادات GEMINI_API_KEY ثم أعد تشغيل الخادم.'
+                elif '404' in message or 'not found' in message:
+                    analysis_message = 'نموذج Gemini المحدد غير متاح لهذا المفتاح. راجع إعدادات GEMINI_MODEL.'
+                elif 'timeout' in message or 'timed out' in message:
+                    analysis_message = 'انتهت مهلة الاتصال بمزود AI. تحقق من الإنترنت ثم حاول مرة أخرى.'
+                else:
+                    analysis_message = 'لم يكتمل تحليل هذه الرسالة بسبب تعذر الوصول إلى مزود الذكاء الاصطناعي.'
+        else:
+            reply = 'تم استلام رسالتك، لكن مزود الذكاء الاصطناعي غير مفعّل حاليًا. أضف مفتاحًا صالحًا ثم أعد المحاولة.'
+            analysis_message = f'لم يكتمل تحليل هذه الرسالة لأن مزود {provider.upper()} غير مهيأ.'
+
+        if not corrections:
+            corrections = [
+                {
+                    "wrong": e["wrong_text"],
+                    "correct": e["correct_text"],
+                    "explanation": e["explanation"],
+                }
+                for e in fresh_errors
+            ]
+        if not tips:
+            if fresh_errors:
+                tips.append(f"📝 لاحظت {len(fresh_errors)} ملاحظة جديدة في رسالتك.")
+            elif errors:
+                tips.append("تم تسجيل هذه الملاحظة سابقًا؛ ركّز على استخدامها في سياق جديد.")
+            else:
+                tips.append("🌟 لم تظهر أخطاء واضحة في هذه الرسالة.")
+
+        # Stream the reply in sentence-sized chunks so Flutter can show (and
+        # optionally speak) it progressively instead of waiting for everything.
+        if reply:
+            for chunk in _chunk_sentences(reply):
+                yield _sse_event("reply_chunk", {"text": chunk})
+
+        assistant_message = Message(conversation_id=conversation.id, role="assistant", content=reply)
+        db.add(assistant_message)
+        conversation.updated_at = datetime.now(timezone.utc)
+        user.last_active = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(assistant_message)
+
+        yield _sse_event("final", {
+            "reply": reply,
+            "corrections": corrections,
+            "tips": tips,
+            "conversation_id": conversation.id,
+            "message_id": assistant_message.id,
+            "analysis_completed": analysis_completed,
+            "analysis_message": analysis_message,
+        })
+        yield "event: done\ndata: {}\n\n"
+
+    return StreamingResponse(
+        _generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 

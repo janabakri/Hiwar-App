@@ -952,11 +952,25 @@ class _VoiceScreenState extends State<VoiceScreen> {
           await widget.api.getStoredUserId() ?? await widget.api.getUserId();
       await widget.api
           .saveVoiceTimelineEntry(text: message, durationSeconds: seconds);
-      final result = await widget.api.sendChat(
+      final result = await widget.api.sendChatStream(
           userId: userId,
           message: message,
           conversationId: conversationId,
-          tutorInstruction: tutorInstruction);
+          tutorInstruction: tutorInstruction,
+          onMeta: (cid) {
+            if (conversationId == null && mounted) {
+              setState(() => conversationId = cid);
+            }
+          },
+          onChunk: (text) {
+            // Progressive display: show each sentence as it streams in.
+            if (mounted && analysisCompleted != true) {
+              setState(() {
+                reply = reply.isEmpty ? text : '$reply $text';
+                status = 'يتحدث الآن...';
+              });
+            }
+          });
       if (!mounted) return;
       setState(() {
         conversationId ??= result.conversationId;
