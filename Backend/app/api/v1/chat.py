@@ -25,6 +25,31 @@ from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
+# Reply-length guardrails (change here to tune tutor verbosity).
+MAX_REPLY_WORDS = 45
+MAX_CORRECTIONS = 2
+MAX_TIPS = 2
+
+
+def _limit_reply(text: str) -> str:
+    """Trim an overly long tutor reply to at most MAX_REPLY_WORDS.
+
+    Keeps the trailing question when possible so the learner always has
+    something to answer, and never cuts a sentence mid-word.
+    """
+    words = text.split()
+    if len(words) <= MAX_REPLY_WORDS:
+        return text
+    trimmed = " ".join(words[:MAX_REPLY_WORDS])
+    # End at the last complete sentence within the budget.
+    import re
+    match = re.search(r"^(.*[.!?])", trimmed, re.DOTALL)
+    result = match.group(1).strip() if match else trimmed
+    # If the trimmed text lost its closing question, fall back to a short one.
+    if not result.endswith(("?", ".", "!")):
+        result += "?"
+    return result
+
 
 def _resolve_user(requested_user_id: str, current_user: User | None, db: Session) -> User:
     """Return the authenticated user owning `requested_user_id`.
@@ -237,13 +262,25 @@ def chat(
     New errors found in this message: {fresh_errors}
     Extra learner request for this turn: {request.tutor_instruction or 'none'}
 
-    Requirements:
-    1. Reply naturally at the learner's demonstrated level.
-    2. Correct only genuine grammar or vocabulary errors from this message, briefly and contextually.
-    3. Do not repeat a correction that is not in the new errors list.
-    4. Ask one fresh, relevant follow-up question; do not reuse a fixed prompt.
-    5. Do not make pronunciation claims from text alone.
-    6. Return only valid JSON with this shape:
+    STRICT LENGTH RULES (highest priority):
+    1. "reply" MUST be 1-3 short sentences, at most 45 words total.
+    2. Use simple, everyday English matched to the learner's level.
+    3. Correct at most TWO mistakes, each correction explanation in one short sentence.
+    4. Give at most TWO tips, one sentence each.
+    5. Never write long explanations, lists, or lectures unless the learner explicitly asks.
+    6. Always end "reply" with one short question to keep the learner talking.
+
+    Example of the expected brevity:
+    User: I go to the mall yesterday.
+    Assistant reply: Nice! Just a tip: we say "I went" for the past. What did you buy there?
+
+    Other requirements:
+    a. Reply naturally at the learner's demonstrated level.
+    b. Correct only genuine grammar or vocabulary errors from this message, briefly and contextually.
+    c. Do not repeat a correction that is not in the new errors list.
+    d. Ask one fresh, relevant follow-up question; do not reuse a fixed prompt.
+    e. Do not make pronunciation claims from text alone.
+    f. Return only valid JSON with this shape:
        {{"reply":"...","corrections":[{{"wrong":"...","correct":"...","explanation":"..."}}],"tips":["..."]}}
     """
 
@@ -296,7 +333,7 @@ def chat(
                     raise
                 parsed = {"reply": plain_reply, "corrections": [], "tips": []}
             if isinstance(parsed.get("reply"), str) and parsed["reply"].strip():
-                reply = parsed["reply"].strip()
+                reply = _limit_reply(parsed["reply"].strip())
                 analysis_completed = True
                 analysis_message = None
             if isinstance(parsed.get("corrections"), list):
@@ -306,10 +343,10 @@ def chat(
                         "correct": str(item.get("correct", "")),
                         "explanation": str(item.get("explanation", "")),
                     }
-                    for item in parsed["corrections"]
+                    for item in parsed["corrections"][:MAX_CORRECTIONS]
                     if isinstance(item, dict) and item.get("wrong") and item.get("correct")
                 ]
-            ai_tips = [str(item) for item in parsed.get("tips", []) if item]
+            ai_tips = [str(item) for item in parsed.get("tips", [])[:MAX_TIPS] if item]
         except (json.JSONDecodeError, TypeError, ValueError) as exc:
             logger.warning("AI structured output error: %s", exc)
             analysis_message = 'لم يكتمل التحليل المنظم لهذه الرسالة، لكن يمكنك متابعة المحادثة. حاول مرة أخرى للحصول على التصحيحات.'
