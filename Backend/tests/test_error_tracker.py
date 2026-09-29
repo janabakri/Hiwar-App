@@ -10,11 +10,25 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.services.error_tracker import detect_errors, COMMON_ERRORS
+from app.services.error_tracker import detect_errors, COMMON_ERRORS, IRREGULAR_PAST_ERRORS
 
 
 class TestErrorDetection:
     """Test error detection functionality."""
+
+    def test_detect_overregularised_past_tense(self):
+        errors = detect_errors("Yesterday I goed to school and eated pizza. I goed home.")
+        found = {e["wrong_text"]: e["correct_text"] for e in errors}
+        assert found == {"goed": "went", "eated": "ate"}
+
+    def test_real_words_are_not_flagged_as_past_tense_errors(self):
+        assert detect_errors("I planted a seed and singed my hair") == []
+
+    def test_verbs_with_two_correct_past_forms_are_not_listed(self):
+        both_correct = ["learned", "dreamed", "burned", "spelled", "smelled",
+                        "spilled", "lighted", "leaped", "kneeled", "dived", "leaved"]
+        assert [w for w in both_correct if w in IRREGULAR_PAST_ERRORS] == []
+        assert detect_errors("I learned and dreamed and burned the toast") == []
 
     def test_detect_grammar_error_i_am_go(self):
         """Test detection of 'I am go' -> 'I am going'."""

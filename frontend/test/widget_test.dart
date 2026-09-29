@@ -1,30 +1,54 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:speak_replica/main.dart';
+import 'package:speak_replica/services/hiwar_api.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('HiwarChatResult.fromJson', () {
+    test('parses a full /chat response', () {
+      final result = HiwarChatResult.fromJson({
+        'reply': 'Nice! What did you buy?',
+        'corrections': [
+          {'wrong': 'goed', 'correct': 'went', 'explanation': 'Past of go.'}
+        ],
+        'tips': ['Irregular verbs change in the past.'],
+        'conversation_id': 3,
+        'message_id': 12,
+        'analysis_completed': true,
+      });
+      expect(result.reply, 'Nice! What did you buy?');
+      expect(result.corrections.single['wrong'], 'goed');
+      expect(result.corrections.single['correct'], 'went');
+      expect(result.tips, hasLength(1));
+      expect(result.conversationId, 3);
+      expect(result.messageId, 12);
+      expect(result.analysisCompleted, isTrue);
+    });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    test('treats a missing analysis flag as not completed', () {
+      final result = HiwarChatResult.fromJson({'reply': 'Hi'});
+      expect(result.corrections, isEmpty);
+      expect(result.tips, isEmpty);
+      expect(result.analysisCompleted, isFalse);
+    });
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  test('HiwarError.fromJson reads the repeat count', () {
+    final error = HiwarError.fromJson(
+        {'id': 1, 'wrong': 'goed', 'correct': 'went', 'count': 2});
+    expect(error.count, 2);
+    expect(error.errorType, 'general');
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  test('HiwarProfile.fromJson defaults an unassessed level to pending', () {
+    final profile = HiwarProfile.fromJson({'user_id': 'u1', 'name': 'Jana'});
+    expect(profile.level, 'pending');
+    expect(profile.levelScore, 0);
+    expect(profile.profileComplete, isFalse);
+  });
+
+  test('HiwarApi.isValidEmail rejects placeholder domains', () {
+    expect(HiwarApi.isValidEmail('learner@gmail.com'), isTrue);
+    expect(HiwarApi.isValidEmail('you@example.com'), isFalse);
+    expect(HiwarApi.isValidEmail('not-an-email'), isFalse);
   });
 }

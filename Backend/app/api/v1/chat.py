@@ -39,6 +39,8 @@ TUTOR_TEMPERATURE = 0.4
 # How many recurring, not-yet-mastered errors to share with the tutor.
 MAX_KNOWN_ERRORS_IN_PROMPT = 5
 MAX_ERROR_TEXT_LENGTH = 200
+# Shorter saved mistakes (e.g. "a" -> "an") are too ambiguous to match in new text.
+MIN_REPEAT_MATCH_LENGTH = 4
 
 
 def _word_count(sentences: List[str]) -> int:
@@ -146,6 +148,48 @@ def _upsert_user_error(
     return True
 
 
+def _contains_phrase(normalized_text: str, phrase: str) -> bool:
+    """Whole-word match of an already-normalized phrase."""
+    return re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", normalized_text) is not None
+
+
+def _overlaps_any(key: str, keys) -> bool:
+    """True if `key` is, contains, or is contained in one of `keys`
+    (so "goed" and "i goed" count as the same mistake)."""
+    return any(_contains_phrase(key, k) or _contains_phrase(k, key) for k in keys)
+
+
+def _count_repeated_known_errors(
+    db: Session, user: User, message: str, handled_error_keys: set
+) -> List[UserError]:
+    """Count saved, not-yet-mastered mistakes the learner repeats in `message`.
+
+    Done in code so the repeat counter does not depend on the AI noticing
+    (or being available at all).
+    """
+    normalized_message = _normalize_error_text(message)
+    known = db.query(UserError).filter(
+        UserError.user_id == user.id,
+        UserError.mastered == False,  # noqa: E712
+    ).all()
+    repeated = []
+    for error in known:
+        key = _normalize_error_text(error.wrong_text)
+        if (
+            len(key) < MIN_REPEAT_MATCH_LENGTH
+            or _overlaps_any(key, handled_error_keys)
+            or _contains_phrase(_normalize_error_text(error.correct_text), key)
+            or not _contains_phrase(normalized_message, key)
+        ):
+            continue
+        handled_error_keys.add(key)
+        error.count += 1
+        error.last_occurrence = datetime.now(timezone.utc)
+        repeated.append(error)
+        logger.info("Known error repeated: %s (count: %s)", error.wrong_text, error.count)
+    return repeated
+
+
 def _build_system_prompt(
     tutor_level: str,
     known_errors: List[UserError],
@@ -179,7 +223,7 @@ STRICT LENGTH RULES (highest priority):
 CORRECTIONS:
 - Look at the learner's LATEST message only. Correct genuine grammar or vocabulary errors in it, most important first, at most {MAX_CORRECTIONS}.
 - "wrong" must be the exact words the learner wrote; "correct" is the fixed version; "explanation" is one short sentence; "type" is "grammar" or "vocabulary".
-- Do not re-correct mistakes from earlier messages. If the latest message has no real errors, return an empty "corrections" list.
+- Only quote text from the latest message. If it repeats a mistake from earlier (including the recurring mistakes below), correct it again. If the latest message has no real errors, return an empty "corrections" list.
 - Give at most {MAX_TIPS} tips, one short sentence each.
 - Do not make pronunciation claims from text alone.
 
@@ -201,6 +245,17 @@ Example of the expected brevity:
 Learner: I go to the mall yesterday.
 reply: "Nice! We say 'I went' for the past. What did you buy there?"
 """
+
+
+def _extract_reply_field(raw: str) -> str:
+    """Best-effort read of the "reply" string from malformed JSON output."""
+    match = re.search(r'"reply"\s*:\s*"((?:[^"\\]|\\.)*)"', raw)
+    if not match:
+        return ""
+    try:
+        return json.loads(f'"{match.group(1)}"').strip()
+    except json.JSONDecodeError:
+        return ""
 
 
 def _parse_json_object(raw: str) -> dict:
@@ -392,6 +447,7 @@ def chat(
             context=request.message,
         ):
             fresh_errors.append(error_data)
+    repeated_errors = _count_repeated_known_errors(db, user, request.message, handled_error_keys)
 
     db.commit()
 
@@ -462,6 +518,10 @@ def chat(
                 # it as an error; corrections remain empty until structured output
                 # is available.
                 plain_reply = raw_output.strip()
+                if plain_reply.replace("```json", "").lstrip("`\n ").startswith("{") or '"reply"' in plain_reply:
+                    # Malformed JSON (e.g. a degenerate generation): salvage the
+                    # reply field only, never show raw JSON to the learner.
+                    plain_reply = _extract_reply_field(plain_reply)
                 if not plain_reply:
                     raise
                 parsed = {"reply": plain_reply, "corrections": [], "tips": []}
@@ -491,7 +551,7 @@ def chat(
                 normalized_message = _normalize_error_text(request.message)
                 for item in ai_corrections:
                     key = _normalize_error_text(item["wrong"])
-                    if not key or key in handled_error_keys or key not in normalized_message:
+                    if not key or key not in normalized_message or _overlaps_any(key, handled_error_keys):
                         continue
                     handled_error_keys.add(key)
                     _upsert_user_error(
@@ -533,15 +593,26 @@ def chat(
         }
         for e in fresh_errors
     ]
+    # Also surface mistakes the checker found or the learner repeated,
+    # in case the AI didn't list them this time.
+    checker_hits = [(e["wrong_text"], e["correct_text"], e["explanation"]) for e in errors]
+    checker_hits += [(e.wrong_text, e.correct_text, e.explanation or "") for e in repeated_errors]
+    for wrong, correct, explanation in checker_hits:
+        if len(corrections) >= MAX_CORRECTIONS:
+            break
+        listed = [_normalize_error_text(c["wrong"]) for c in corrections]
+        if not _overlaps_any(_normalize_error_text(wrong), listed):
+            corrections.append({"wrong": wrong, "correct": correct, "explanation": explanation})
 
     # 6. Tips: keep deterministic feedback and append structured provider tips.
     tips = list(ai_tips)
     if not tips:
         if fresh_errors:
             tips.append(f"📝 لاحظت {len(fresh_errors)} ملاحظة جديدة في رسالتك.")
-        elif errors:
+        elif errors or repeated_errors:
             tips.append("تم تسجيل هذه الملاحظة سابقًا؛ ركّز على استخدامها في سياق جديد.")
-        else:
+        elif analysis_completed:
+            # Only claim "no errors" when the AI actually checked the message.
             tips.append("🌟 لم تظهر أخطاء واضحة في هذه الرسالة.")
 
     assistant_message = Message(conversation_id=conversation.id, role="assistant", content=reply)

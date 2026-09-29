@@ -57,6 +57,27 @@ COMMON_ERRORS = [
     },
 ]
 
+# Over-regularised irregular past forms: wrong -> (correct past, base verb).
+# Only non-words are listed, so real words like "seed" or "singed" never match.
+IRREGULAR_PAST_ERRORS = {
+    "goed": ("went", "go"), "eated": ("ate", "eat"), "buyed": ("bought", "buy"),
+    "runned": ("ran", "run"), "comed": ("came", "come"), "taked": ("took", "take"),
+    "maked": ("made", "make"), "writed": ("wrote", "write"), "drinked": ("drank", "drink"),
+    "bringed": ("brought", "bring"), "thinked": ("thought", "think"), "teached": ("taught", "teach"),
+    "catched": ("caught", "catch"), "sleeped": ("slept", "sleep"), "feeled": ("felt", "feel"),
+    "keeped": ("kept", "keep"), "meeted": ("met", "meet"), "speaked": ("spoke", "speak"),
+    "telled": ("told", "tell"), "knowed": ("knew", "know"), "drived": ("drove", "drive"),
+    "swimmed": ("swam", "swim"), "sitted": ("sat", "sit"), "getted": ("got", "get"),
+    "gived": ("gave", "give"), "falled": ("fell", "fall"), "finded": ("found", "find"),
+    "winned": ("won", "win"), "losed": ("lost", "lose"), "sayed": ("said", "say"),
+    "standed": ("stood", "stand"), "understanded": ("understood", "understand"),
+    "choosed": ("chose", "choose"), "forgetted": ("forgot", "forget"), "spended": ("spent", "spend"),
+    "sended": ("sent", "send"), "builded": ("built", "build"), "weared": ("wore", "wear"),
+    "breaked": ("broke", "break"), "flyed": ("flew", "fly"), "throwed": ("threw", "throw"),
+    "becomed": ("became", "become"), "begined": ("began", "begin"),
+}
+
+
 def detect_errors(text: str) -> List[Dict]:
     """Detect errors in user text."""
     errors = []
@@ -82,6 +103,16 @@ def detect_errors(text: str) -> List[Dict]:
                 "correct_text": correct_text,
                 "error_type": error["type"],
                 "explanation": error["explanation"]
+            })
+
+    for word in dict.fromkeys(re.findall(r"[a-z]+", text_lower)):
+        if word in IRREGULAR_PAST_ERRORS:
+            correct, base = IRREGULAR_PAST_ERRORS[word]
+            errors.append({
+                "wrong_text": word,
+                "correct_text": correct,
+                "error_type": "grammar",
+                "explanation": f"The past tense of '{base}' is '{correct}'",
             })
 
     return errors
