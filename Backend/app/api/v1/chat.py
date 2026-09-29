@@ -4,6 +4,7 @@ Chat API endpoints with database integration.
 
 import json
 import logging
+import re
 import time
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
@@ -26,28 +27,50 @@ from openai import OpenAI
 logger = logging.getLogger(__name__)
 
 # Reply-length guardrails (change here to tune tutor verbosity).
+MAX_REPLY_SENTENCES = 3
 MAX_REPLY_WORDS = 45
 MAX_CORRECTIONS = 2
 MAX_TIPS = 2
 
 
-def _limit_reply(text: str) -> str:
-    """Trim an overly long tutor reply to at most MAX_REPLY_WORDS.
+def _word_count(sentences: List[str]) -> int:
+    return len(" ".join(sentences).split())
 
-    Keeps the trailing question when possible so the learner always has
-    something to answer, and never cuts a sentence mid-word.
+
+def _limit_reply(text: str) -> str:
+    """Trim a tutor reply to MAX_REPLY_SENTENCES / MAX_REPLY_WORDS.
+
+    Cuts on sentence boundaries, keeps the closing follow-up question so the
+    learner always has something to answer, and never appends a fake "?"
+    to a truncated sentence.
     """
-    words = text.split()
-    if len(words) <= MAX_REPLY_WORDS:
+    text = " ".join(text.split())
+    if not text:
         return text
-    trimmed = " ".join(words[:MAX_REPLY_WORDS])
-    # End at the last complete sentence within the budget.
-    import re
-    match = re.search(r"^(.*[.!?])", trimmed, re.DOTALL)
-    result = match.group(1).strip() if match else trimmed
-    # If the trimmed text lost its closing question, fall back to a short one.
-    if not result.endswith(("?", ".", "!")):
-        result += "?"
+    sentences = [s for s in re.split(r"(?<=[.!?؟])\s+", text) if s]
+
+    kept: List[str] = []
+    for sentence in sentences:
+        candidate = kept + [sentence]
+        if len(candidate) > MAX_REPLY_SENTENCES or (
+            kept and _word_count(candidate) > MAX_REPLY_WORDS
+        ):
+            break
+        kept = candidate
+
+    # If the closing question was dropped, bring it back: append it when it
+    # fits, otherwise swap it in for the last kept sentence.
+    last = sentences[-1]
+    if last.endswith(("?", "؟")) and last not in kept:
+        if len(kept) < MAX_REPLY_SENTENCES and _word_count(kept + [last]) <= MAX_REPLY_WORDS:
+            kept.append(last)
+        elif len(kept) > 1:
+            kept[-1] = last
+
+    result = " ".join(kept)
+    words = result.split()
+    if len(words) > MAX_REPLY_WORDS:  # one very long sentence
+        result = " ".join(words[:MAX_REPLY_WORDS]).rstrip(",;:") + "..."
     return result
 
 
@@ -343,10 +366,10 @@ def chat(
                         "correct": str(item.get("correct", "")),
                         "explanation": str(item.get("explanation", "")),
                     }
-                    for item in parsed["corrections"][:MAX_CORRECTIONS]
+                    for item in parsed["corrections"]
                     if isinstance(item, dict) and item.get("wrong") and item.get("correct")
-                ]
-            ai_tips = [str(item) for item in parsed.get("tips", [])[:MAX_TIPS] if item]
+                ][:MAX_CORRECTIONS]
+            ai_tips = [str(item) for item in parsed.get("tips", []) if item][:MAX_TIPS]
         except (json.JSONDecodeError, TypeError, ValueError) as exc:
             logger.warning("AI structured output error: %s", exc)
             analysis_message = 'لم يكتمل التحليل المنظم لهذه الرسالة، لكن يمكنك متابعة المحادثة. حاول مرة أخرى للحصول على التصحيحات.'
