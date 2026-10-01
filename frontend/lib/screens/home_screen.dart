@@ -681,7 +681,10 @@ class _VoiceScreenState extends State<VoiceScreen> {
   bool submittedCurrent = false;
   bool openingPlayed = false;
   bool ttsConfigured = false;
-  bool showTutorText = true;
+  // المكالمة صوتية أولًا: نص رد المدرب مخفي افتراضيًا ويظهر عند الطلب.
+  bool showTutorText = false;
+  // بين وصول الرد وبدء صوته؛ لا نعرض الرد قبل أن يُسمع.
+  bool preparingAudio = false;
   String voicePreference = 'female';
   double speechRate = 0.92;
   String? tutorInstruction;
@@ -785,7 +788,8 @@ class _VoiceScreenState extends State<VoiceScreen> {
   }
 
   Future<void> toggleListening() async {
-    if (sending) return;
+    // لا نبدأ الاستماع قبل أن يبدأ صوت الرد، حتى لا يتداخل مع كلام المتعلم.
+    if (sending || preparingAudio) return;
     await tts.stop();
     if (listening) {
       await speech.stop();
@@ -902,15 +906,19 @@ class _VoiceScreenState extends State<VoiceScreen> {
             () => status = 'لا يوجد رد صالح من المدرب حتى يكتمل تحليل Gemini.');
       return;
     }
-    // 1) جرّب صوت ElevenLabs من الخادم (إن كان مهيأً).
+    // 1) صوت طبيعي من الخادم (ElevenLabs أو Gemini TTS) إن كان مهيأً.
     try {
       final bytes =
           await widget.api.synthesizeSpeech(text: text, voice: voicePreference);
       if (bytes != null) {
+        await tts.stop();
         final player = AudioPlayer();
         await player.play(BytesSource(Uint8List.fromList(bytes)));
         if (mounted)
-          setState(() => status = 'صوت المدرب (ElevenLabs) يعمل الآن');
+          setState(() {
+            preparingAudio = false;
+            status = 'المدرب يتكلم...';
+          });
         return;
       }
     } catch (_) {
@@ -922,11 +930,19 @@ class _VoiceScreenState extends State<VoiceScreen> {
       await tts.stop();
       final result = await tts.speak(text);
       if (result == 0) throw StateError('TTS_FAILED');
-      if (mounted) setState(() => status = 'صوت المدرب يعمل الآن');
-    } catch (_) {
       if (mounted)
-        setState(() =>
-            status = 'تعذر تشغيل الصوت. تحقق من مستوى صوت الجهاز ثم أعد المحادثة.');
+        setState(() {
+          preparingAudio = false;
+          status = 'المدرب يتكلم...';
+        });
+    } catch (_) {
+      // بدون صوت لا تتوقف المحادثة: نعرض النص كحل أخير.
+      if (mounted)
+        setState(() {
+          preparingAudio = false;
+          showTutorText = true;
+          status = 'تعذر تشغيل الصوت، فعرضنا رد المدرب كتابةً. تحقق من مستوى صوت الجهاز.';
+        });
     }
   }
 
@@ -970,9 +986,11 @@ class _VoiceScreenState extends State<VoiceScreen> {
         exchanges++;
         sending = false;
         active = true;
+        preparingAudio =
+            result.analysisCompleted && result.reply.trim().isNotEmpty;
         status = !result.analysisCompleted
             ? 'تم حفظ كلامك دون اكتمال التحليل'
-            : 'يتحدث الآن...';
+            : 'يجهز صوت المدرب...';
       });
       if (result.reply.trim().isNotEmpty && result.analysisCompleted) {
         await _speakReply();
@@ -994,6 +1012,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
                 : HiwarApi.describeError(error);
         setState(() {
           sending = false;
+          preparingAudio = false;
           submittedCurrent = false;
           analysisCompleted = false;
           analysisError = message;
@@ -1091,7 +1110,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
                       ),
                     ),
                     child: Center(
-                      child: sending
+                      child: sending || preparingAudio
                           ? const CircularProgressIndicator(color: Colors.white)
                           : listening
                               ? Row(
@@ -1154,7 +1173,9 @@ class _VoiceScreenState extends State<VoiceScreen> {
                               overflow: TextOverflow.ellipsis,
                               style: ar(12, color: inkSoft))),
                   ],
-                  if (reply.trim().isNotEmpty && analysisCompleted)
+                  if (reply.trim().isNotEmpty &&
+                      analysisCompleted &&
+                      !preparingAudio)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                       child: _Card(
@@ -1162,9 +1183,13 @@ class _VoiceScreenState extends State<VoiceScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(children: [
-                              const Icon(Icons.volume_up_outlined,
-                                  size: 18, color: primary),
-                              const SizedBox(width: 7),
+                              IconButton(
+                                  tooltip: 'أعد سماع الرد',
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: listening ? null : _speakReply,
+                                  icon: const Icon(Icons.replay_rounded,
+                                      size: 20, color: primary)),
+                              const SizedBox(width: 2),
                               Text('رد المدرب',
                                   style: ar(12.5, weight: FontWeight.w800)),
                               const Spacer(),
