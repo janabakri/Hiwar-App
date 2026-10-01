@@ -47,3 +47,6 @@ frontend/ios/Flutter/ephemeral/
 frontend/macos/Flutter/ephemeral/
 frontend/.flutter-plugins*
 
+
+# Local test output
+Backend/pytest_out.txt
